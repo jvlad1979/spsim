@@ -358,6 +358,10 @@ if __name__ == "__main__":
     # Define voltage range for the sweep (e.g., from barrier fully open to closed)
     sweep_voltages = np.linspace(-0.1, 0.4, 26) # Example range: -0.1V to 0.4V, 26 points
     barrier_potentials = [] # To store the minimum potential under the swept gate
+    estimated_currents = [] # To store the estimated current
+
+    # Parameter for current estimation exponential decay (e.g., 5 meV)
+    current_decay_energy_scale_J = 0.005 * e
 
     # Find the index corresponding to the center of the swept gate
     # Gate B2 center: (Lx * 0.50, Ly * 0.5)
@@ -397,10 +401,18 @@ if __name__ == "__main__":
             min_barrier_potential_J = np.min(potential_slice)
             barrier_potentials.append(min_barrier_potential_J)
             print(f"  -> Minimum barrier potential: {min_barrier_potential_J / e:.4f} eV")
+
+            # Estimate current based on barrier height relative to Fermi level
+            # Simple exponential decay model
+            current_estimate = np.exp(-(min_barrier_potential_J - fermi_level_J) / current_decay_energy_scale_J)
+            estimated_currents.append(current_estimate)
+            print(f"  -> Estimated current (arb. units): {current_estimate:.3e}")
+
         else:
             print(f"  -> Simulation failed for {gate_to_sweep} = {v_sweep:.3f} V. Skipping point.")
             # Append NaN or handle missing data appropriately
             barrier_potentials.append(np.nan)
+            estimated_currents.append(np.nan) # Append NaN for current as well
 
     sweep_end_time = time.time()
     print("-" * 50)
@@ -423,6 +435,20 @@ if __name__ == "__main__":
     plot_filename = f"pinchoff_curve_{gate_to_sweep}.png"
     plt.savefig(plot_filename)
     print(f"Pinch-off plot saved to {plot_filename}")
+
+    # --- Plotting Estimated Current Trace ---
+    plt.figure(figsize=(8, 6))
+    plt.plot(sweep_voltages, estimated_currents, marker='o', linestyle='-')
+    plt.xlabel(f"Gate Voltage {gate_to_sweep} (V)")
+    plt.ylabel("Estimated Current (arb. units)")
+    plt.title(f"Estimated Current Trace vs. Gate Voltage ({gate_to_sweep})")
+    plt.grid(True)
+    plt.tight_layout()
+
+    plot_filename_current = f"estimated_current_trace_{gate_to_sweep}.png"
+    plt.savefig(plot_filename_current)
+    print(f"Estimated current trace plot saved to {plot_filename_current}")
+
 
     # Optional: Plot the final potential landscape for the last voltage point
     if total_potential is not None:
