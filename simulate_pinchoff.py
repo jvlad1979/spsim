@@ -411,11 +411,17 @@ if __name__ == "__main__":
             )
 
             # Estimate current based on barrier height relative to Fermi level
-            # Simple exponential decay model
-            current_estimate = np.exp(
-                -(min_barrier_potential_J - fermi_level_J)
-                / current_decay_energy_scale_J
-            )
+            # Use a simple model that saturates when the barrier is below the Fermi level
+            barrier_height_relative_to_fermi_J = min_barrier_potential_J - fermi_level_J
+
+            if barrier_height_relative_to_fermi_J > 0:
+                # Exponential decay when barrier is above Fermi level (pinch-off)
+                current_estimate = np.exp(-barrier_height_relative_to_fermi_J / current_decay_energy_scale_J)
+            else:
+                # Saturated current when barrier is at or below Fermi level (open channel)
+                # We set a constant value, e.g., 1.0, representing the maximum current in arbitrary units
+                current_estimate = 1.0 # Or np.exp(0) = 1.0, for continuity at barrier_height=0
+
             estimated_currents.append(current_estimate)
             print(f"  -> Estimated current (arb. units): {current_estimate:.3e}")
 
