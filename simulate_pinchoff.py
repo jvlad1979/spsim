@@ -351,14 +351,18 @@ if __name__ == "__main__":
     # Define Fermi level (relative to minimum external potential)
     # Calculate based on initial voltages, but keep constant during sweep
     initial_ext_pot_J = get_external_potential(X, Y, applied_voltages)
-    fermi_level_J = np.min(initial_ext_pot_J) + 0.01 * e  # Example: 10 meV above min potential
+    fermi_level_J = (
+        np.min(initial_ext_pot_J) + 0.01 * e
+    )  # Example: 10 meV above min potential
 
     # --- Pinch-off Sweep Parameters ---
     gate_to_sweep = "B2"
     # Define voltage range for the sweep (e.g., from barrier fully open to closed)
-    sweep_voltages = np.linspace(-0.1, 0.4, 26) # Example range: -0.1V to 0.4V, 26 points
-    barrier_potentials = [] # To store the minimum potential under the swept gate
-    estimated_currents = [] # To store the estimated current
+    sweep_voltages = np.linspace(
+        -0.5, 0.5, 26
+    )  # Example range: -0.1V to 0.4V, 26 points
+    barrier_potentials = []  # To store the minimum potential under the swept gate
+    estimated_currents = []  # To store the estimated current
 
     # Parameter for current estimation exponential decay (e.g., 5 meV)
     current_decay_energy_scale_J = 0.005 * e
@@ -368,7 +372,9 @@ if __name__ == "__main__":
     center_x_idx = np.argmin(np.abs(x - Lx * 0.50))
     center_y_idx = np.argmin(np.abs(y - Ly * 0.50))
     # Define a small region around the gate center in x to find the minimum potential
-    barrier_region_x_indices = slice(max(0, center_x_idx - 5), min(Nx, center_x_idx + 6))
+    barrier_region_x_indices = slice(
+        max(0, center_x_idx - 5), min(Nx, center_x_idx + 6)
+    )
 
     print(f"\n--- Starting Pinch-off Sweep for Gate {gate_to_sweep} ---")
     print(f"Voltage range: {sweep_voltages[0]:.3f} V to {sweep_voltages[-1]:.3f} V")
@@ -390,7 +396,7 @@ if __name__ == "__main__":
                 fermi_level_J,
                 max_iter=30,
                 tol=1e-4,
-                mixing=0.05, # Use same parameters as before, adjust if needed
+                mixing=0.05,  # Use same parameters as before, adjust if needed
             )
         )
 
@@ -400,31 +406,45 @@ if __name__ == "__main__":
             potential_slice = total_potential[barrier_region_x_indices, center_y_idx]
             min_barrier_potential_J = np.min(potential_slice)
             barrier_potentials.append(min_barrier_potential_J)
-            print(f"  -> Minimum barrier potential: {min_barrier_potential_J / e:.4f} eV")
+            print(
+                f"  -> Minimum barrier potential: {min_barrier_potential_J / e:.4f} eV"
+            )
 
             # Estimate current based on barrier height relative to Fermi level
             # Simple exponential decay model
-            current_estimate = np.exp(-(min_barrier_potential_J - fermi_level_J) / current_decay_energy_scale_J)
+            current_estimate = np.exp(
+                -(min_barrier_potential_J - fermi_level_J)
+                / current_decay_energy_scale_J
+            )
             estimated_currents.append(current_estimate)
             print(f"  -> Estimated current (arb. units): {current_estimate:.3e}")
 
         else:
-            print(f"  -> Simulation failed for {gate_to_sweep} = {v_sweep:.3f} V. Skipping point.")
+            print(
+                f"  -> Simulation failed for {gate_to_sweep} = {v_sweep:.3f} V. Skipping point."
+            )
             # Append NaN or handle missing data appropriately
             barrier_potentials.append(np.nan)
-            estimated_currents.append(np.nan) # Append NaN for current as well
+            estimated_currents.append(np.nan)  # Append NaN for current as well
 
     sweep_end_time = time.time()
     print("-" * 50)
-    print(f"Pinch-off sweep finished in {sweep_end_time - sweep_start_time:.2f} seconds.")
+    print(
+        f"Pinch-off sweep finished in {sweep_end_time - sweep_start_time:.2f} seconds."
+    )
 
     # --- Plotting Pinch-off Curve ---
     # Convert barrier potentials to eV for plotting
     barrier_potentials_eV = np.array(barrier_potentials) / e
 
     plt.figure(figsize=(8, 6))
-    plt.plot(sweep_voltages, barrier_potentials_eV, marker='o', linestyle='-')
-    plt.axhline(fermi_level_J / e, color='r', linestyle='--', label=f'Fermi Level ({fermi_level_J/e:.3f} eV)')
+    plt.plot(sweep_voltages, barrier_potentials_eV, marker="o", linestyle="-")
+    plt.axhline(
+        fermi_level_J / e,
+        color="r",
+        linestyle="--",
+        label=f"Fermi Level ({fermi_level_J / e:.3f} eV)",
+    )
     plt.xlabel(f"Gate Voltage {gate_to_sweep} (V)")
     plt.ylabel("Minimum Potential under Gate (eV)")
     plt.title(f"Pinch-off Curve: Barrier Potential vs. Gate Voltage ({gate_to_sweep})")
@@ -438,7 +458,7 @@ if __name__ == "__main__":
 
     # --- Plotting Estimated Current Trace ---
     plt.figure(figsize=(8, 6))
-    plt.plot(sweep_voltages, estimated_currents, marker='o', linestyle='-')
+    plt.plot(sweep_voltages, estimated_currents, marker="o", linestyle="-")
     plt.xlabel(f"Gate Voltage {gate_to_sweep} (V)")
     plt.ylabel("Estimated Current (arb. units)")
     plt.title(f"Estimated Current Trace vs. Gate Voltage ({gate_to_sweep})")
@@ -448,7 +468,6 @@ if __name__ == "__main__":
     plot_filename_current = f"estimated_current_trace_{gate_to_sweep}.png"
     plt.savefig(plot_filename_current)
     print(f"Estimated current trace plot saved to {plot_filename_current}")
-
 
     # Optional: Plot the final potential landscape for the last voltage point
     if total_potential is not None:
@@ -464,34 +483,68 @@ if __name__ == "__main__":
         p1_center_vis = (Lx * 0.35, Ly * 0.5)
         p2_center_vis = (Lx * 0.65, Ly * 0.5)
         b1_center_vis = (Lx * 0.15, Ly * 0.5)
-        b2_center_vis = (Lx * 0.50, Ly * 0.5) # Center of swept gate
+        b2_center_vis = (Lx * 0.50, Ly * 0.5)  # Center of swept gate
         b3_center_vis = (Lx * 0.85, Ly * 0.5)
-        gate_centers_vis = { "P1": p1_center_vis, "P2": p2_center_vis, "B1": b1_center_vis, "B2": b2_center_vis, "B3": b3_center_vis }
-        gate_colors = { "P1": "blue", "P2": "cyan", "B1": "red", "B2": "magenta", "B3": "orange" }
+        gate_centers_vis = {
+            "P1": p1_center_vis,
+            "P2": p2_center_vis,
+            "B1": b1_center_vis,
+            "B2": b2_center_vis,
+            "B3": b3_center_vis,
+        }
+        gate_colors = {
+            "P1": "blue",
+            "P2": "cyan",
+            "B1": "red",
+            "B2": "magenta",
+            "B3": "orange",
+        }
         gate_styles = {"P1": "--", "P2": "--", "B1": ":", "B2": ":", "B3": ":"}
         for name, center in gate_centers_vis.items():
             ellipse = patches.Ellipse(
                 xy=(center[0] * 1e9, center[1] * 1e9),
-                width=2 * gate_std_dev_x_vis * 1e9, height=2 * gate_std_dev_y_vis * 1e9,
-                edgecolor=gate_colors[name], facecolor="none", linestyle=gate_styles[name],
-                linewidth=1.5, label=name
+                width=2 * gate_std_dev_x_vis * 1e9,
+                height=2 * gate_std_dev_y_vis * 1e9,
+                edgecolor=gate_colors[name],
+                facecolor="none",
+                linestyle=gate_styles[name],
+                linewidth=1.5,
+                label=name,
             )
             ax.add_patch(ellipse)
         handles, labels = ax.get_legend_handles_labels()
         patch_handles = [h for h in handles if isinstance(h, patches.Patch)]
-        patch_labels = [l for h, l in zip(handles, labels) if isinstance(h, patches.Patch)]
+        patch_labels = [
+            l for h, l in zip(handles, labels) if isinstance(h, patches.Patch)
+        ]
         if patch_handles:
-            ax.legend(patch_handles, patch_labels, title="Gates", loc="upper right", fontsize="small")
+            ax.legend(
+                patch_handles,
+                patch_labels,
+                title="Gates",
+                loc="upper right",
+                fontsize="small",
+            )
 
         # Highlight the line where barrier potential was measured
-        plt.plot([x[barrier_region_x_indices].min()*1e9, x[barrier_region_x_indices].max()*1e9],
-                 [y[center_y_idx]*1e9, y[center_y_idx]*1e9],
-                 color='yellow', linestyle='-', linewidth=2, label='Barrier Slice')
-        ax.legend() # Update legend to include barrier slice line
+        plt.plot(
+            [
+                x[barrier_region_x_indices].min() * 1e9,
+                x[barrier_region_x_indices].max() * 1e9,
+            ],
+            [y[center_y_idx] * 1e9, y[center_y_idx] * 1e9],
+            color="yellow",
+            linestyle="-",
+            linewidth=2,
+            label="Barrier Slice",
+        )
+        ax.legend()  # Update legend to include barrier slice line
 
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
-        plt.title(f"Final Potential Landscape ({gate_to_sweep} = {sweep_voltages[-1]:.3f} V)")
+        plt.title(
+            f"Final Potential Landscape ({gate_to_sweep} = {sweep_voltages[-1]:.3f} V)"
+        )
         plt.axis("equal")
         plt.tight_layout()
         plot_filename_final_pot = f"final_potential_{gate_to_sweep}_sweep.png"
@@ -499,4 +552,6 @@ if __name__ == "__main__":
         print(f"Final potential plot saved to {plot_filename_final_pot}")
 
     else:
-        print("Self-consistent calculation failed for the last point. No final potential plot.")
+        print(
+            "Self-consistent calculation failed for the last point. No final potential plot."
+        )
