@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # Define Fermi level (chemical potential of the electron reservoir)
     # Example: Set slightly above the lowest potential energy
     ext_pot = get_external_potential(x, applied_voltages)
-    fermi_level_J = np.min(ext_pot) + 0.01 * e # Example: 10 meV above min potential (in Joules)
+    fermi_level_J = np.min(ext_pot) + 0.05 * e # Example: 50 meV above min potential (in Joules)
 
     # Run the self-consistent solver
     total_potential, charge_density, eigenvalues, eigenvectors = self_consistent_solver(
@@ -268,6 +268,8 @@ if __name__ == "__main__":
         plt.ylim(ymin, ymax + scale * 2) # Adjust ylim to show wavefunctions
 
         plt.tight_layout()
-        plt.show()
+        plot_filename = "simulation_results.png"
+        plt.savefig(plot_filename)
+        print(f"Plot saved to {plot_filename}")
     else:
         print("Self-consistent calculation failed. No results to plot.")
