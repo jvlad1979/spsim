@@ -34,20 +34,39 @@ dx = x[1] - x[0]
 # For now, let's define a simple external potential function
 def get_external_potential(x, voltages):
     """
-    Calculates the external potential profile based on gate voltages.
-    This is a placeholder and needs specific implementation based on device geometry.
-    Example: A Gaussian quantum well.
+    Calculates the external potential profile for a double dot device
+    based on gate voltages applied to plungers and barriers.
+    Uses Gaussian profiles for each gate's influence.
     """
-    V0 = -0.2 * e  # Depth of the well in Joules (e.g., 0.2 eV)
-    well_center = L / 2
-    well_std_dev = 20e-9 # Standard deviation defining the well width
+    potential = np.zeros_like(x)
 
-    # Gaussian potential: V(x) = V0 * exp(-(x - center)^2 / (2 * std_dev^2))
-    potential = V0 * np.exp(-(x - well_center)**2 / (2 * well_std_dev**2))
+    # Define gate parameters (centers and widths in meters)
+    # Adjust these based on desired dot separation and size
+    gate_std_dev = 15e-9 # Standard deviation for all gates
+    p1_center = L * 0.35
+    p2_center = L * 0.65
+    b1_center = L * 0.20 # Left barrier
+    b2_center = L * 0.50 # Center barrier
+    b3_center = L * 0.80 # Right barrier
 
-    # Placeholder for adding actual gate voltage contributions
-    # potential += voltages['plunger1'] * gate_profile_plunger1(x)
-    # potential += voltages['barrier1'] * gate_profile_barrier1(x)
+    # Helper function for Gaussian potential shape
+    # Amplitude is voltage * e (energy), sign depends on gate type
+    def gaussian_potential(center, std_dev, amplitude):
+        return amplitude * np.exp(-(x - center)**2 / (2 * std_dev**2))
+
+    # Add potential contributions from each gate based on applied voltages
+    # Plunger voltages (typically negative) lower the potential energy
+    potential += gaussian_potential(p1_center, gate_std_dev, voltages.get('P1', 0.0) * e)
+    potential += gaussian_potential(p2_center, gate_std_dev, voltages.get('P2', 0.0) * e)
+
+    # Barrier voltages (typically positive) raise the potential energy
+    # Note: Here we assume positive voltage values map to positive potential energy barriers
+    potential += gaussian_potential(b1_center, gate_std_dev, voltages.get('B1', 0.0) * e)
+    potential += gaussian_potential(b2_center, gate_std_dev, voltages.get('B2', 0.0) * e)
+    potential += gaussian_potential(b3_center, gate_std_dev, voltages.get('B3', 0.0) * e)
+
+    # Optional: Add a constant background potential offset if needed
+    # potential += background_offset * e
 
     return potential
 
@@ -215,12 +234,14 @@ def self_consistent_solver(voltages, fermi_level, max_iter=100, tol=1e-6, mixing
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    # Define applied voltages (example)
-    # This needs to match the structure expected by get_external_potential
+    # Define applied voltages for the double dot device (Volts)
+    # Adjust these values to shape the double well potential
     applied_voltages = {
-        'plunger1': 0.0, # Volts
-        'barrier1': 0.0, # Volts
-        # Add other gates as needed
+        'P1': -0.25,  # Plunger 1 voltage (negative to create well)
+        'P2': -0.25,  # Plunger 2 voltage
+        'B1': 0.1,   # Left barrier voltage (positive to create barrier)
+        'B2': 0.15,  # Center barrier voltage
+        'B3': 0.1,   # Right barrier voltage
     }
 
     # Define Fermi level (chemical potential of the electron reservoir)
