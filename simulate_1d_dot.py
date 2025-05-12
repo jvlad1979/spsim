@@ -169,7 +169,7 @@ def self_consistent_solver(voltages, fermi_level, max_iter=100, tol=1e-6, mixing
         eigenvalues, eigenvectors = solve_schrodinger(total_potential_J)
         if not eigenvalues.size:
             print("Error in Schrödinger solver. Aborting.")
-            return None, None, None # Indicate failure
+            return None, None, None, None # Indicate failure
 
         # 3. Calculate charge density
         new_charge_density = calculate_charge_density(eigenvalues, eigenvectors, fermi_level)
