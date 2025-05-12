@@ -275,6 +275,11 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
     electrostatic_potential_V = np.zeros((Nx, Ny))  # Potential in Volts
     external_potential_J = get_external_potential(X, Y, voltages)  # Potential in Joules
 
+    # Adaptive mixing parameters
+    initial_mixing = mixing
+    min_mixing = 0.01
+    mixing_decay_rate = 0.9  # Reduce mixing by this factor if not converging
+
     for i in range(max_iter):
         iter_start_time = time.time()
         print(f"Iteration {i + 1}/{max_iter}")
@@ -306,6 +311,13 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
             electrostatic_potential_V = new_electrostatic_potential_V
             break
 
+        # Check if potential difference is increasing (not converging)
+        if i > 0 and potential_diff_norm > previous_potential_diff_norm:
+            mixing *= mixing_decay_rate
+            if mixing < min_mixing:
+                mixing = min_mixing
+            print(f"  Reducing mixing parameter to {mixing:.3f}")
+
         # 6. Mix potential for stability
         electrostatic_potential_V = electrostatic_potential_V + mixing * (
             new_electrostatic_potential_V - electrostatic_potential_V
@@ -313,6 +325,8 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
 
         iter_end_time = time.time()
         print(f"  Iteration time: {iter_end_time - iter_start_time:.2f} seconds")
+
+        previous_potential_diff_norm = potential_diff_norm
 
     else:  # Loop finished without break
         print(f"Warning: Did not converge after {max_iter} iterations.")
