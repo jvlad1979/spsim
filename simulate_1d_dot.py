@@ -266,8 +266,26 @@ if __name__ == "__main__":
         plt.axhline(fermi_level_J / e, color='r', linestyle=':', label=f'Fermi Level ({fermi_level_J/e:.3f} eV)')
         plt.xlabel("Position (nm)")
         plt.ylabel("Potential Energy (eV)")
-        plt.title("Self-Consistent Potential Profile")
-        plt.legend()
+        plt.title("Self-Consistent Potential Profile & Gate Layout")
+
+        # --- Add Gate Visualization ---
+        # Re-define gate parameters used in get_external_potential for visualization
+        gate_std_dev_vis = 15e-9 # Standard deviation for all gates
+        p1_center_vis = L * 0.35
+        p2_center_vis = L * 0.65
+        b1_center_vis = L * 0.20 # Left barrier
+        b2_center_vis = L * 0.50 # Center barrier
+        b3_center_vis = L * 0.80 # Right barrier
+
+        # Draw vertical lines for gate centers
+        plt.axvline(x=p1_center_vis * 1e9, color='blue', linestyle='--', alpha=0.7, label='P1 Center')
+        plt.axvline(x=p2_center_vis * 1e9, color='cyan', linestyle='--', alpha=0.7, label='P2 Center')
+        plt.axvline(x=b1_center_vis * 1e9, color='red', linestyle=':', alpha=0.7, label='B1 Center')
+        plt.axvline(x=b2_center_vis * 1e9, color='magenta', linestyle=':', alpha=0.7, label='B2 Center')
+        plt.axvline(x=b3_center_vis * 1e9, color='orange', linestyle=':', alpha=0.7, label='B3 Center')
+        # --- End Gate Visualization ---
+
+        plt.legend(loc='upper right') # Update legend location if needed
         plt.grid(True)
 
         # Plot 2: Charge Density and Wavefunctions

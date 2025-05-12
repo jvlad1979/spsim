@@ -10,6 +10,7 @@ import scipy.constants as const
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import time
 
 # --- Physical Constants ---
@@ -366,27 +367,70 @@ if __name__ == "__main__":
         print("Plotting results...")
         plt.figure(figsize=(15, 10))
 
+        # --- Define Gate Parameters for Visualization ---
+        # Re-define gate parameters used in get_external_potential
+        gate_std_dev_x_vis = 20e-9
+        gate_std_dev_y_vis = 20e-9
+        p1_center_vis = (Lx * 0.35, Ly * 0.5)
+        p2_center_vis = (Lx * 0.65, Ly * 0.5)
+        b1_center_vis = (Lx * 0.15, Ly * 0.5)
+        b2_center_vis = (Lx * 0.50, Ly * 0.5)
+        b3_center_vis = (Lx * 0.85, Ly * 0.5)
+        gate_centers_vis = {
+            'P1': p1_center_vis, 'P2': p2_center_vis,
+            'B1': b1_center_vis, 'B2': b2_center_vis, 'B3': b3_center_vis
+        }
+        gate_colors = {'P1': 'blue', 'P2': 'cyan', 'B1': 'red', 'B2': 'magenta', 'B3': 'orange'}
+        gate_styles = {'P1': '--', 'P2': '--', 'B1': ':', 'B2': ':', 'B3': ':'}
+
+        # Helper function to add gate patches
+        def add_gate_patches(ax):
+            for name, center in gate_centers_vis.items():
+                ellipse = patches.Ellipse(
+                    xy=(center[0] * 1e9, center[1] * 1e9),
+                    width=2 * gate_std_dev_x_vis * 1e9, # Representing approx. 2*std_dev width/height
+                    height=2 * gate_std_dev_y_vis * 1e9,
+                    edgecolor=gate_colors[name],
+                    facecolor='none',
+                    linestyle=gate_styles[name],
+                    linewidth=1.5,
+                    label=name # Label for legend
+                )
+                ax.add_patch(ellipse)
+            # Create a legend for gates, avoiding duplicate labels from contour etc.
+            handles, labels = ax.get_legend_handles_labels()
+            # Filter patch handles for the legend
+            patch_handles = [h for h in handles if isinstance(h, patches.Patch)]
+            patch_labels = [l for h, l in zip(handles, labels) if isinstance(h, patches.Patch)]
+            if patch_handles: # Add legend only if patches were added
+                 ax.legend(patch_handles, patch_labels, title="Gates", loc='upper right', fontsize='small')
+
+
         # Plot 1: Total Potential Energy Profile (Contour)
-        plt.subplot(2, 2, 1)
+        ax1 = plt.subplot(2, 2, 1)
         contour = plt.contourf(
             X * 1e9, Y * 1e9, total_potential / e, levels=50, cmap="viridis"
         )
         plt.colorbar(contour, label="Total Potential (eV)")
+        add_gate_patches(ax1) # Add gate visualization
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
-        plt.title("Self-Consistent Potential")
+        plt.title("Self-Consistent Potential & Gates")
         plt.axis("equal")
 
+
         # Plot 2: External Potential Energy Profile (Contour)
-        plt.subplot(2, 2, 2)
+        ax2 = plt.subplot(2, 2, 2)
         contour_ext = plt.contourf(
             X * 1e9, Y * 1e9, ext_pot_J / e, levels=50, cmap="viridis"
         )
         plt.colorbar(contour_ext, label="External Potential (eV)")
+        add_gate_patches(ax2) # Add gate visualization
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
-        plt.title("External Potential")
+        plt.title("External Potential & Gates")
         plt.axis("equal")
+
 
         # Plot 3: Charge Density (Contour/Image)
         plt.subplot(2, 2, 3)
