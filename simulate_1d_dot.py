@@ -36,15 +36,19 @@ def get_external_potential(x, voltages):
     """
     Calculates the external potential profile based on gate voltages.
     This is a placeholder and needs specific implementation based on device geometry.
-    Example: A simple quantum well.
+    Example: A Gaussian quantum well.
     """
-    V0 = -0.1 * e # Depth of the well in Joules (e.g., 0.1 eV)
-    well_width = 50e-9
+    V0 = -0.2 * e  # Depth of the well in Joules (e.g., 0.2 eV)
     well_center = L / 2
-    potential = np.zeros_like(x)
-    potential[np.abs(x - well_center) < well_width / 2] = V0
-    # Add contributions from voltages here based on actual gate layout
-    # For example: potential += voltages['plunger1'] * gate_profile_plunger1(x)
+    well_std_dev = 20e-9 # Standard deviation defining the well width
+
+    # Gaussian potential: V(x) = V0 * exp(-(x - center)^2 / (2 * std_dev^2))
+    potential = V0 * np.exp(-(x - well_center)**2 / (2 * well_std_dev**2))
+
+    # Placeholder for adding actual gate voltage contributions
+    # potential += voltages['plunger1'] * gate_profile_plunger1(x)
+    # potential += voltages['barrier1'] * gate_profile_barrier1(x)
+
     return potential
 
 # --- Schrödinger Solver ---
@@ -252,20 +256,33 @@ if __name__ == "__main__":
         plt.plot(x * 1e9, charge_density_per_nm, label='Electron Density (electrons/nm)')
 
         # Plot lowest few wavefunctions (scaled for visibility)
+        plot_lines = [plt.gca().lines[-1]] # Start with the density plot line
         if eigenvalues.size > 0:
-            ymin, ymax = plt.ylim()
-            scale = (ymax - ymin) * 0.1 # Scaling factor for wavefunctions
+            # Determine a suitable scale based on the density plot range or a fixed value
+            density_min, density_max = np.min(charge_density_per_nm), np.max(charge_density_per_nm)
+            density_range = max(density_max - density_min, 1e-9) # Avoid division by zero if density is flat
+            scale = density_range * 2.0 # Scale factor for wavefunctions relative to density range
+
             for i in range(min(5, len(eigenvalues))): # Plot up to 5 lowest states
                 # Shift wavefunction vertically by its energy (in eV)
-                psi_plot = (eigenvalues[i] / e) + scale * np.abs(eigenvectors[:, i])**2 * (dx / 1e-9) # Probability density |psi|^2 / nm
-                plt.plot(x * 1e9, psi_plot, label=f'E{i} ({eigenvalues[i]/e:.3f} eV)')
+                # Probability density |psi|^2 / nm, scaled for visibility
+                psi_scaled = np.abs(eigenvectors[:, i])**2 * (dx / 1e-9)
+                # Normalize the peak of the scaled psi^2 to the 'scale' value for consistent plotting
+                psi_scaled *= scale / np.max(psi_scaled) if np.max(psi_scaled) > 1e-9 else 1.0
+                psi_plot = (eigenvalues[i] / e) + psi_scaled # Shift baseline to energy level
+                line, = plt.plot(x * 1e9, psi_plot, label=f'E{i} ({eigenvalues[i]/e:.3f} eV)')
+                plot_lines.append(line)
 
         plt.xlabel("Position (nm)")
-        plt.ylabel("Electron Density (electrons/nm) / Wavefunctions")
+        plt.ylabel("Electron Density / Scaled |Ψ|^²")
         plt.title("Electron Density and Wavefunctions")
         plt.legend(loc='upper right')
         plt.grid(True)
-        plt.ylim(ymin, ymax + scale * 2) # Adjust ylim to show wavefunctions
+
+        # Adjust ylim dynamically to fit all plotted data (density + wavefunctions)
+        min_y_val = min(line.get_ydata().min() for line in plot_lines)
+        max_y_val = max(line.get_ydata().max() for line in plot_lines)
+        plt.ylim(min_y_val - 0.1 * abs(min_y_val), max_y_val + 0.1 * abs(max_y_val)) # Add 10% margin
 
         plt.tight_layout()
         plot_filename = "simulation_results.png"
