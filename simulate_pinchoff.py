@@ -51,8 +51,8 @@ def get_external_potential(X, Y, voltages):
 
     # Define gate parameters (centers and widths in meters)
     # Example: A double dot defined by top gates
-    gate_std_dev_x = 20e-9
-    gate_std_dev_y = 20e-9  # Can be different for x and y
+    gate_std_dev_x = 10e-9  # Reduced gate size
+    gate_std_dev_y = 10e-9  # Reduced gate size
 
     # Gate positions (example)
     p1_center = (Lx * 0.35, Ly * 0.5)
@@ -173,21 +173,20 @@ def solve_schrodinger_2d(potential_2d):
 # --- Charge Density Calculation (2D) ---
 def calculate_charge_density_2d(eigenvalues, eigenvectors_2d, fermi_level):
     """
-    Calculates the 2D electron charge density (C/m^2).
-    Assumes zero temperature.
+    Calculates the 2D electron charge density (C/m^2) using Fermi-Dirac statistics.
     """
-    density_2d = np.zeros((Nx, Ny))  # electrons/m^2
+    temperature = 0.1  # Temperature in Kelvin (adjust as needed)
+    kT = const.k * temperature  # Thermal energy
+
+    density_2d = np.zeros((Nx, Ny))
     num_states = eigenvectors_2d.shape[2]
 
-    # Factor of 2 for spin degeneracy
     for i in range(num_states):
-        if eigenvalues[i] < fermi_level:
-            density_2d += 2 * np.abs(eigenvectors_2d[:, :, i]) ** 2
-        else:
-            break  # Eigenvalues are sorted
+        # Fermi-Dirac distribution
+        fermi_dirac = 1 / (1 + np.exp((eigenvalues[i] - fermi_level) / kT))
+        density_2d += 2 * fermi_dirac * np.abs(eigenvectors_2d[:, :, i]) ** 2
 
-    # Charge density (negative for electrons)
-    charge_density_2d = -e * density_2d  # Coulombs per square meter (C/m^2)
+    charge_density_2d = -e * density_2d
     return charge_density_2d
 
 
@@ -367,17 +366,18 @@ if __name__ == "__main__":
     # Calculate based on initial voltages, but keep constant during sweep
     initial_ext_pot_J = get_external_potential(X, Y, applied_voltages)
     fermi_level_J = (
-        np.min(initial_ext_pot_J) + 0.01 * e
-    )  # Example: 10 meV above min potential
+        np.min(initial_ext_pot_J) + 0.02 * e
+    )  # Adjusted Fermi level
 
     # --- Pinch-off Sweep Parameters ---
     gate_to_sweep = "B2"
     # Define voltage range for the sweep (e.g., from barrier fully open to closed)
     sweep_voltages = np.linspace(
-        -0.5, 0.5, 26
-    )  # Example range: -0.1V to 0.4V, 26 points
-    barrier_potentials = []  # To store the minimum potential under the swept gate
-    estimated_currents = []  # To store the estimated current
+        -0.3, 0.3, 101
+    )  # Finer sweep range and more points
+    barrier_potentials = []
+    estimated_currents = []
+    electron_numbers = []  # Store the number of electrons in the dot
 
     # Parameter for current estimation exponential decay (e.g., 5 meV)
     current_decay_energy_scale_J = 0.005 * e
@@ -425,28 +425,17 @@ if __name__ == "__main__":
                 f"  -> Minimum barrier potential: {min_barrier_potential_J / e:.4f} eV"
             )
 
-            # Estimate current based on barrier height relative to Fermi level
-            # Use a simple model that saturates when the barrier is below the Fermi level
-            barrier_height_relative_to_fermi_J = min_barrier_potential_J - fermi_level_J
-
-            if barrier_height_relative_to_fermi_J > 0:
-                # Exponential decay when barrier is above Fermi level (pinch-off)
-                current_estimate = np.exp(-barrier_height_relative_to_fermi_J / current_decay_energy_scale_J)
-            else:
-                # Saturated current when barrier is at or below Fermi level (open channel)
-                # We set a constant value, e.g., 1.0, representing the maximum current in arbitrary units
-                current_estimate = 1.0 # Or np.exp(0) = 1.0, for continuity at barrier_height=0
-
-            estimated_currents.append(current_estimate)
-            print(f"  -> Estimated current (arb. units): {current_estimate:.3e}")
+            # Calculate the number of electrons in the dot
+            electron_number = np.sum(charge_density * dx * dy) / (-e)
+            electron_numbers.append(electron_number)
+            print(f"  -> Number of electrons in the dot: {electron_number:.3f}")
 
         else:
             print(
                 f"  -> Simulation failed for {gate_to_sweep} = {v_sweep:.3f} V. Skipping point."
             )
-            # Append NaN or handle missing data appropriately
             barrier_potentials.append(np.nan)
-            estimated_currents.append(np.nan)  # Append NaN for current as well
+            electron_numbers.append(np.nan)
 
     sweep_end_time = time.time()
     print("-" * 50)
@@ -477,18 +466,18 @@ if __name__ == "__main__":
     plt.savefig(plot_filename)
     print(f"Pinch-off plot saved to {plot_filename}")
 
-    # --- Plotting Estimated Current Trace ---
+    # --- Plotting Number of Electrons vs Gate Voltage ---
     plt.figure(figsize=(8, 6))
-    plt.plot(sweep_voltages, estimated_currents, marker="o", linestyle="-")
+    plt.plot(sweep_voltages, electron_numbers, marker="o", linestyle="-")
     plt.xlabel(f"Gate Voltage {gate_to_sweep} (V)")
-    plt.ylabel("Estimated Current (arb. units)")
-    plt.title(f"Estimated Current Trace vs. Gate Voltage ({gate_to_sweep})")
+    plt.ylabel("Number of Electrons in Dot")
+    plt.title(f"Number of Electrons vs. Gate Voltage ({gate_to_sweep})")
     plt.grid(True)
     plt.tight_layout()
 
-    plot_filename_current = f"estimated_current_trace_{gate_to_sweep}.png"
-    plt.savefig(plot_filename_current)
-    print(f"Estimated current trace plot saved to {plot_filename_current}")
+    plot_filename_electrons = f"number_of_electrons_{gate_to_sweep}.png"
+    plt.savefig(plot_filename_electrons)
+    print(f"Number of electrons plot saved to {plot_filename_electrons}")
 
     # Optional: Plot the final potential landscape for the last voltage point
     if total_potential is not None:
