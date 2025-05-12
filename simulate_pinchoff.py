@@ -279,6 +279,7 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
     initial_mixing = mixing
     min_mixing = 0.01
     mixing_decay_rate = 0.9  # Reduce mixing by this factor if not converging
+    previous_potential_diff_norm = float('inf')  # Initialize to a large value
 
     for i in range(max_iter):
         iter_start_time = time.time()
