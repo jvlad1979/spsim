@@ -66,10 +66,10 @@ def solve_schrodinger(potential):
     # Using shift-invert mode (sigma) is generally better for finding lowest states
     try:
         # Find eigenvalues near the minimum of the potential
-        potential_min = np.min(potential)
         num_eigenstates = 10 # Number of eigenstates to compute
         # Use sparse solver spla.eigsh for Hermitian matrices
-        eigenvalues, eigenvectors = spla.eigsh(H, k=num_eigenstates, which='SM', sigma=potential_min)
+        # Using which='SM' (Smallest Magnitude) without sigma can be more robust
+        eigenvalues, eigenvectors = spla.eigsh(H, k=num_eigenstates, which='SM')
         # eigsh returns sorted eigenvalues
     except Exception as e:
         print(f"Eigenvalue solver failed: {e}")
