@@ -188,6 +188,9 @@ def calculate_charge_density_2d(eigenvalues, eigenvectors_2d, fermi_level):
 # --- Total Electron Number Calculation ---
 def calculate_total_electrons(charge_density_2d):
     """Calculates the total number of electrons by integrating the charge density."""
+    # Ensure charge_density_2d is a numpy array
+    charge_density_2d = np.asarray(charge_density_2d)
+
     # Integrate density (electrons/m^2) over area (dx*dy)
     total_charge = np.sum(charge_density_2d * dx * dy)
     total_electrons = total_charge / (-e)
