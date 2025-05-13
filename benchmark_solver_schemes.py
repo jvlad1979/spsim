@@ -435,23 +435,38 @@ if __name__ == "__main__":
     def calculate_stats(timings_list):
         if not timings_list:
             # Ensure all expected keys are present even for empty lists
-            stat_keys = ["iterations", "total_time", "ext_potential_time", 
+            # Removed "iterations" from stat_keys
+            stat_keys = ["total_time", "ext_potential_time", 
                          "schrodinger_time_avg", "charge_calc_time_avg", "poisson_time_avg"]
-            return {key: {"mean": np.nan, "std": np.nan, "count": 0, "converged_count":0} for key in stat_keys}
+            # Initialize converged_count for the "iterations" key as well, as it's used for reporting total converged samples
+            base_return = {key: {"mean": np.nan, "std": np.nan, "count": 0, "converged_count":0} for key in stat_keys}
+            base_return["iterations"] = {"mean": np.nan, "std": np.nan, "count": 0, "converged_count":0} # Keep structure for converged_count
+            return base_return
 
         stats = {}
         # converged_count is based on the number of items in timings_list, assuming only converged runs are added
         converged_runs = len(timings_list)
+        
+        # Define keys for which to calculate full stats (mean, std)
+        keys_for_full_stats = ["total_time", "ext_potential_time", "schrodinger_time_avg", "charge_calc_time_avg", "poisson_time_avg"]
 
-        for key in timings_list[0].keys(): # Use keys from the first valid timing dict
+        all_timing_keys = list(timings_list[0].keys()) # Get all keys from a sample timing dict
+
+        for key in all_timing_keys:
             if key.endswith("_per_iter") or key == "converged": # Skip these raw lists or boolean
                 continue
             
-            values = [d[key] for d in timings_list if isinstance(d.get(key), (int, float))]
-            if values:
-                stats[key] = {"mean": np.mean(values), "std": np.std(values), "count": len(values), "converged_count": converged_runs}
-            else: # Should not happen if timings_list is not empty and contains valid numbers
-                stats[key] = {"mean": np.nan, "std": np.nan, "count": 0, "converged_count": converged_runs}
+            if key in keys_for_full_stats:
+                values = [d[key] for d in timings_list if isinstance(d.get(key), (int, float))]
+                if values:
+                    stats[key] = {"mean": np.mean(values), "std": np.std(values), "count": len(values), "converged_count": converged_runs}
+                else: 
+                    stats[key] = {"mean": np.nan, "std": np.nan, "count": 0, "converged_count": converged_runs}
+            elif key == "iterations": # For "iterations", only store count and converged_count
+                values = [d[key] for d in timings_list if isinstance(d.get(key), (int, float))] # Still get values for count
+                stats[key] = {"mean": np.nan, "std": np.nan, "count": len(values), "converged_count": converged_runs}
+            # else: # Other keys not explicitly handled
+                # pass
         return stats
 
     for sch_config in schrodinger_solver_configs_to_test:
@@ -532,11 +547,11 @@ if __name__ == "__main__":
                 print(f"      Converged Samples: {conv_count}/{N_SAMPLES}")
                 if conv_count > 0:
                     for metric, values in stats_dict.items():
-                        if "converged_count" in values: # Already printed
+                        if "converged_count" in values and metric != "iterations": # Already printed for converged samples
                             pass
+                        if metric == "iterations": # Skip printing stats for iterations
+                            continue
                         print(f"      Avg {metric.replace('_', ' ').title()}: {values['mean']:.3f} s (std: {values['std']:.3f})")
-                        if metric == "iterations": # Iterations is not time
-                             print(f"      Avg {metric.replace('_', ' ').title()}: {values['mean']:.1f} (std: {values['std']:.1f})")
 
 
     print("\n--- Notes ---")
@@ -563,7 +578,7 @@ if __name__ == "__main__":
             "total_time": "Avg Total Time (s)",
             "schrodinger_time_avg": "Avg Schrödinger Time / Iter (s)",
             "poisson_time_avg": "Avg Poisson Time / Iter (s)",
-            "iterations": "Avg Iterations"
+            # "iterations": "Avg Iterations" # Removed iterations from plot
         }
 
         n_metrics = len(metrics_to_plot)
