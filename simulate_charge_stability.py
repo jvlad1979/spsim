@@ -331,7 +331,15 @@ def self_consistent_solver_2d(
         print(f"Running SC calculation for voltages: {voltages}")
     start_time_sc = time.time()
 
-    electrostatic_potential_V = np.zeros((Nx, Ny))
+    if initial_potential_V is None:
+        electrostatic_potential_V = np.zeros((Nx, Ny))
+        if verbose:
+            print("  Using cold start (initial_potential_V is None).")
+    else:
+        electrostatic_potential_V = initial_potential_V.copy()
+        if verbose:
+            print("  Using warm start (initial_potential_V is provided).")
+            
     external_potential_J = get_external_potential(X, Y, voltages)
 
     final_charge_density = None  # Initialize in case of early exit
