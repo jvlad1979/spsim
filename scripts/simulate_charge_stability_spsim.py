@@ -7,26 +7,30 @@ Modified to simulate charge stability diagrams by sweeping two gate voltages.
 """
 
 import numpy as np
-import scipy.constants as const
-import scipy.sparse as sp
-import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+# matplotlib.patches was not used.
 import time
-import os  # Added for creating output directory
-import numpy.fft as fft  # Added for spectral methods
-from hilbertcurve.hilbertcurve import HilbertCurve # Added for Hilbert curve warm start
+import os
+
+# Imports from spsim package
+from spsim import constants
+from spsim.device.potential import get_external_potential
+from spsim.simulation_runtime.charge_density import calculate_total_electrons
+from spsim.simulation_runtime.sc_solver import self_consistent_solver_2d
+from spsim.measurement_helpers.sweep_utils import get_hilbert_order
+
 
 # --- Physical Constants ---
-hbar = const.hbar
-m_e = const.m_e
-e = const.e
-epsilon_0 = const.epsilon_0
+hbar = constants.hbar
+m_e = constants.m_e
+e = constants.e  # Elementary charge
+epsilon_0 = constants.epsilon_0
 
 # --- Material Parameters (e.g., GaAs) ---
-m_eff = 0.067 * m_e  # Effective mass
-eps_r = 12.9  # Relative permittivity
-epsilon = eps_r * epsilon_0
+# These are now taken directly from spsim.constants where they are pre-calculated or defined
+m_eff = constants.m_eff  # Effective mass
+eps_r = constants.eps_r  # Relative permittivity
+epsilon = constants.epsilon # Permittivity of material
 
 # --- Simulation Grid ---
 # Reduced grid for faster stability diagram calculation
@@ -45,366 +49,33 @@ X, Y = np.meshgrid(
 )  # Important: 'ij' indexing matches matrix layout
 
 # --- Spectral Method Setup ---
-# Define k-space grid for spectral methods (assuming periodic boundary conditions)
-kx = 2 * np.pi * fft.fftfreq(Nx, d=dx)
-ky = 2 * np.pi * fft.fftfreq(Ny, d=dy)
-Kx, Ky = np.meshgrid(kx, ky, indexing="ij")
-K_sq = Kx**2 + Ky**2
-# Avoid division by zero at K=0 (DC component).
-# For periodic BCs, the DC component of the potential is arbitrary; setting it to 0 is common.
-# The inverse Laplacian of the DC component is undefined, so we handle it separately.
-# Replace K_sq[0,0] with a small non-zero value or handle the DC term explicitly in the solver.
-# Handling explicitly in the solver is cleaner.
-
+# The K-space grid (Kx, Ky, K_sq) is no longer needed globally,
+# as the spsim.solvers.poisson.solve_poisson_2d_spectral handles it internally.
 
 # --- Device Parameters ---
-def get_external_potential(X, Y, voltages):
-    """
-    Calculates the 2D external potential profile based on gate voltages.
-    Uses 2D Gaussian profiles for gate influence.
-    """
-    potential = np.zeros_like(X)  # Potential in Joules
-
-    # Define gate parameters (centers and widths in meters)
-    # Example: A double dot defined by top gates
-    gate_std_dev_x = 20e-9
-    gate_std_dev_y = 20e-9  # Can be different for x and y
-
-    # Gate positions (example) - Same as simulate_2d_dot
-    p1_center = (Lx * 0.35, Ly * 0.5)
-    p2_center = (Lx * 0.65, Ly * 0.5)
-    b1_center = (Lx * 0.15, Ly * 0.5)  # Left barrier
-    b2_center = (Lx * 0.50, Ly * 0.5)  # Center barrier
-    b3_center = (Lx * 0.85, Ly * 0.5)  # Right barrier
-
-    # Helper function for 2D Gaussian potential shape
-    def gaussian_potential_2d(center_x, center_y, std_dev_x, std_dev_y, amplitude):
-        return amplitude * np.exp(
-            -(
-                (X - center_x) ** 2 / (2 * std_dev_x**2)
-                + (Y - center_y) ** 2 / (2 * std_dev_y**2)
-            )
-        )
-
-    # Add potential contributions from each gate
-    potential += gaussian_potential_2d(
-        p1_center[0],
-        p1_center[1],
-        gate_std_dev_x,
-        gate_std_dev_y,
-        voltages.get("P1", 0.0) * e,
-    )
-    potential += gaussian_potential_2d(
-        p2_center[0],
-        p2_center[1],
-        gate_std_dev_x,
-        gate_std_dev_y,
-        voltages.get("P2", 0.0) * e,
-    )
-    potential += gaussian_potential_2d(
-        b1_center[0],
-        b1_center[1],
-        gate_std_dev_x,
-        gate_std_dev_y,
-        voltages.get("B1", 0.0) * e,
-    )
-    potential += gaussian_potential_2d(
-        b2_center[0],
-        b2_center[1],
-        gate_std_dev_x,
-        gate_std_dev_y,
-        voltages.get("B2", 0.0) * e,
-    )
-    potential += gaussian_potential_2d(
-        b3_center[0],
-        b3_center[1],
-        gate_std_dev_x,
-        gate_std_dev_y,
-        voltages.get("B3", 0.0) * e,
-    )
-
-    return potential  # Potential in Joules
-
+# The get_external_potential function is now imported from spsim.device.potential.
+# Gate definitions are part of the library function.
 
 # --- Schrödinger Solver (2D) ---
-def solve_schrodinger_2d(potential_2d):
-    """
-        Solves the 2D time-independent Schrödinger equation.
-        Returns eigenvalues (energies) and eigenvectors (wavefunctions reshaped to
-    2D).
-    """
-    potential_flat = potential_2d.flatten(order="C")  # Flatten consistently
-
-    # Construct the 2D Hamiltonian using sparse matrix format
-    diag = hbar**2 / (m_eff * dx**2) + hbar**2 / (m_eff * dy**2) + potential_flat
-    offdiag_x = -(hbar**2) / (2 * m_eff * dx**2) * np.ones(N_total)
-    offdiag_y = -(hbar**2) / (2 * m_eff * dy**2) * np.ones(N_total)
-
-    diagonals = [diag, offdiag_x[:-1], offdiag_x[:-1], offdiag_y[:-Nx], offdiag_y[:-Nx]]
-    offsets = [0, -1, 1, -Nx, Nx]
-
-    for i in range(1, Nx):
-        diagonals[1][i * Ny - 1] = 0.0
-    for i in range(Nx - 1):
-        diagonals[2][(i + 1) * Ny - 1] = 0.0
-
-    H = sp.diags(diagonals, offsets, shape=(N_total, N_total), format="csc")
-
-    try:
-        num_eigenstates = 10  # Adjust as needed
-        eigenvalues, eigenvectors_flat = spla.eigsh(H, k=num_eigenstates, which="SM")
-    except Exception as e:
-        print(f"Eigenvalue solver failed: {e}")
-        return np.array([]), np.empty((Nx, Ny, 0))
-
-    eigenvectors = np.zeros((Nx, Ny, num_eigenstates))
-    for i in range(num_eigenstates):
-        psi_flat = eigenvectors_flat[:, i]
-        norm = np.sqrt(np.sum(np.abs(psi_flat) ** 2) * dx * dy)
-        if norm > 1e-12: # Avoid division by zero for zero vectors
-            eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
-        else:
-            eigenvectors[:, :, i] = psi_flat.reshape((Nx, Ny), order="C")
-
-
-    return eigenvalues, eigenvectors
-
+# The solve_schrodinger_2d function is now imported from spsim.solvers.schrodinger.
+# (It's used internally by the self_consistent_solver_2d from spsim)
 
 # --- Charge Density Calculation (2D) ---
-# (Using zero temperature version from simulate_2d_dot.py)
-def calculate_charge_density_2d(eigenvalues, eigenvectors_2d, fermi_level):
-    """
-    Calculates the 2D electron charge density (C/m^2).
-    Assumes zero temperature.
-    """
-    density_2d = np.zeros((Nx, Ny))  # electrons/m^2
-    num_states = eigenvectors_2d.shape[2]
-
-    for i in range(num_states):
-        if eigenvalues[i] < fermi_level:
-            density_2d += 2 * np.abs(eigenvectors_2d[:, :, i]) ** 2  # Factor 2 for spin
-        else:
-            break
-
-    charge_density_2d = -e * density_2d  # Coulombs per square meter (C/m^2)
-    return charge_density_2d
-
+# The calculate_charge_density_2d function is used by self_consistent_solver_2d from spsim.
 
 # --- Total Electron Number Calculation ---
-def calculate_total_electrons(charge_density_2d):
-    """Calculates the total number of electrons by integrating the charge density."""
-    # Ensure charge_density_2d is a numpy array
-    charge_density_2d = np.asarray(charge_density_2d)
-
-    # Integrate density (electrons/m^2) over area (dx*dy)
-    total_charge = np.sum(charge_density_2d * dx * dy)
-    total_electrons = total_charge / (-e)
-    return total_electrons
-
+# The calculate_total_electrons function is now imported from spsim.simulation_runtime.charge_density.
 
 # --- Poisson Solver (2D) ---
-# (Identical to simulate_2d_dot.py - no changes needed here)
-def solve_poisson_2d(charge_density_2d):
-    """
-        Solves the 2D Poisson equation: laplacian(phi) = -rho / epsilon
-        Returns the 2D electrostatic potential phi (Volts).
-        Uses finite differences and assumes Dirichlet boundary conditions (phi=0 on
-    boundary).
-    """
-    rho_flat = charge_density_2d.flatten(order="C")
-
-    diag = (-2 / dx**2 - 2 / dy**2) * np.ones(N_total)
-    offdiag_x = (1 / dx**2) * np.ones(N_total)
-    offdiag_y = (1 / dy**2) * np.ones(N_total)
-
-    diagonals = [diag, offdiag_x[:-1], offdiag_x[:-1], offdiag_y[:-Nx], offdiag_y[:-Nx]]
-    offsets = [0, -1, 1, -Nx, Nx]
-
-    for i in range(1, Nx):
-        diagonals[1][i * Ny - 1] = 0.0
-    for i in range(Nx - 1):
-        diagonals[2][(i + 1) * Ny - 1] = 0.0
-
-    A = sp.diags(diagonals, offsets, shape=(N_total, N_total), format="csc")
-    b = -rho_flat / epsilon
-
-    A = A.tolil()
-    b_modified = b.copy()
-
-    boundary_indices = []
-    boundary_indices.extend(range(0, N_total, Ny))
-    boundary_indices.extend(range(Ny - 1, N_total, Ny))
-    boundary_indices.extend(range(1, Ny - 1))
-    boundary_indices.extend(range(N_total - Ny + 1, N_total - 1))
-    boundary_indices = sorted(list(set(boundary_indices)))
-
-    for idx in boundary_indices:
-        A.rows[idx] = [idx]
-        A.data[idx] = [1.0]
-        b_modified[idx] = 0.0
-
-    A = A.tocsc()
-
-    try:
-        phi_flat = spla.spsolve(A, b_modified)
-    except spla.MatrixRankWarning:
-        print("Warning: Poisson matrix singular. Using iterative solver.")
-        phi_flat, info = spla.gmres(A, b_modified, tol=1e-8, maxiter=2 * N_total)
-        if info != 0:
-            print(f"Poisson solver (GMRES) did not converge (info={info}).")
-            phi_flat = np.zeros_like(rho_flat)
-    except Exception as e:
-        print(f"Poisson solver failed: {e}")
-        phi_flat = np.zeros_like(rho_flat)
-
-    phi_2d = phi_flat.reshape((Nx, Ny), order="C")
-    return phi_2d  # Electrostatic potential in Volts
-
-
-# --- Poisson Solver (2D) - Spectral Method ---
-def solve_poisson_2d_spectral(charge_density_2d):
-    """
-    Solves the 2D Poisson equation: laplacian(phi) = -rho / epsilon
-    Returns the 2D electrostatic potential phi (Volts).
-    Uses spectral methods (FFT) and assumes periodic boundary conditions.
-    """
-    # 1. FFT of charge density
-    rho_k = fft.fft2(charge_density_2d)
-
-    # 2. Solve in Fourier space: phi_k = -rho_k / (epsilon * K_sq)
-    # Handle the DC component (k=0,0) separately.
-    # For periodic BCs, the average potential is arbitrary.
-    # Setting phi_k[0,0] = 0 corresponds to zero average potential.
-    # Create a copy of K_sq to avoid modifying the global variable
-    K_sq_solver = K_sq.copy()
-    K_sq_solver[0, 0] = 1.0  # Set to 1 to avoid division by zero for the DC term
-
-    phi_k = -rho_k / (epsilon * K_sq_solver)
-    phi_k[0, 0] = 0.0  # Explicitly set DC component to zero
-
-    # 3. Inverse FFT to get potential in real space
-    phi_2d = fft.ifft2(phi_k).real  # Take real part as potential is real
-
-    return phi_2d  # Electrostatic potential in Volts
-
+# The solve_poisson_2d (finite difference) and solve_poisson_2d_spectral functions
+# are now imported from spsim.solvers.poisson.
+# (They are used internally by the self_consistent_solver_2d from spsim)
 
 # --- Hilbert Curve Ordering ---
-def get_hilbert_order(nx, ny):
-    """
-    Generates a list of (i, j) indices in Hilbert curve order for an nx x ny grid.
-    """
-    # Determine the Hilbert curve level p such that 2^p >= max(nx, ny)
-    p = int(np.ceil(np.log2(max(nx, ny))))
-    n_dims = 2
-    hilbert_curve = HilbertCurve(p, n_dims)
-
-    # Generate all grid points (indices)
-    points = [(i, j) for i in range(nx) for j in range(ny)]
-
-    # Calculate Hilbert distances for each point
-    distances = hilbert_curve.distances_from_points(points)
-
-    # Sort points based on Hilbert distances
-    hilbert_ordered_indices = [point for _, point in sorted(zip(distances, points))]
-
-    return hilbert_ordered_indices
-
+# The get_hilbert_order function is now imported from spsim.measurement_helpers.sweep_utils.
 
 # --- Self-Consistent Iteration (2D) ---
-# (Modified slightly for stability diagram context)
-def self_consistent_solver_2d(
-    voltages,
-    fermi_level,
-    max_iter=30,
-    tol=1e-4,
-    mixing=0.1,
-    verbose=False,
-    initial_potential_V=None,  # Keep warm start parameter
-    poisson_solver_type="finite_difference",  # Add solver type option
-):
-    """
-    Performs the self-consistent 2D Schrödinger-Poisson calculation.
-    Allows choosing the Poisson solver ('finite_difference' or 'spectral').
-    Returns the final charge density and the converged electrostatic potential.
-    """
-    if verbose:
-        print(f"Running SC calculation for voltages: {voltages}")
-    start_time_sc = time.time()
-
-    if initial_potential_V is None:
-        electrostatic_potential_V = np.zeros((Nx, Ny))
-        if verbose:
-            print("  Using cold start (initial_potential_V is None).")
-    else:
-        electrostatic_potential_V = initial_potential_V.copy()
-        if verbose:
-            print("  Using warm start (initial_potential_V is provided).")
-            
-    external_potential_J = get_external_potential(X, Y, voltages)
-
-    final_charge_density = None  # Initialize in case of early exit
-    # Initialize converged_potential_V with the initial guess or zero potential
-    converged_potential_V = electrostatic_potential_V.copy()
-
-
-    for i in range(max_iter):
-        total_potential_J = external_potential_J - e * electrostatic_potential_V
-        eigenvalues, eigenvectors_2d = solve_schrodinger_2d(total_potential_J)
-
-        if not eigenvalues.size: # Original check
-            print("Error in Schrödinger solver during SC iteration. Aborting.")
-            return None, None  # Indicate failure by returning None for both values
-
-        new_charge_density = calculate_charge_density_2d(
-            eigenvalues, eigenvectors_2d, fermi_level
-        )
-        final_charge_density = new_charge_density  # Store the latest density
-
-        # 4. Solve Poisson equation using the selected solver
-        if poisson_solver_type == "finite_difference":
-            new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
-        elif poisson_solver_type == "spectral":
-            # Note: Spectral solver assumes periodic boundary conditions,
-            # which may differ from the desired physics (Dirichlet).
-            new_electrostatic_potential_V = solve_poisson_2d_spectral(
-                new_charge_density
-            )
-        else:
-            raise ValueError(f"Unknown poisson_solver_type: {poisson_solver_type}")
-
-        # 5. Check for convergence (using norm of potential difference)
-        potential_diff_norm = np.linalg.norm(
-            new_electrostatic_potential_V - electrostatic_potential_V
-        ) * np.sqrt(dx * dy)
-
-        if verbose and (i % 5 == 0 or i == max_iter - 1):  # Print progress less often
-            print(
-                f"  SC Iter {i + 1}/{max_iter}, Potential diff norm: {potential_diff_norm:.3e}"
-            )
-
-        if potential_diff_norm < tol:
-            if verbose:
-                print(f"  Converged after {i + 1} iterations.")
-            electrostatic_potential_V = new_electrostatic_potential_V
-            break
-
-        electrostatic_potential_V = electrostatic_potential_V + mixing * (
-            new_electrostatic_potential_V - electrostatic_potential_V
-        )
-    else:
-        print(
-            f"Warning: SC loop did not converge after {max_iter} iterations for {voltages}."
-        )
-
-    end_time_sc = time.time()
-    if verbose:
-        print(f"  SC loop time: {end_time_sc - start_time_sc:.2f} seconds")
-
-    # Assign the final electrostatic potential before returning
-    converged_potential_V = electrostatic_potential_V
-
-    # Return the last calculated charge density and the final electrostatic potential
-    return final_charge_density, converged_potential_V
+# The self_consistent_solver_2d function is now imported from spsim.simulation_runtime.sc_solver.
 
 
 # --- Main Execution ---
@@ -435,14 +106,15 @@ if __name__ == "__main__":
     ref_voltages = base_voltages.copy()
     ref_voltages[gate1_name] = np.mean(gate1_voltages)  # Use mid-range voltage
     ref_voltages[gate2_name] = np.mean(gate2_voltages)
-    initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
+    # Call to spsim's get_external_potential requires Lx, Ly
+    initial_ext_pot_J = get_external_potential(X, Y, ref_voltages, Lx, Ly)
     # Set Fermi level slightly above the potential minimum of the reference configuration
     # to ensure some states are occupied within the sweep range.
     fermi_level_J = (
         np.min(initial_ext_pot_J) + 0.05 * e
     )  # Example: 50 meV above min potential
 
-    print("\n--- Starting Charge Stability Diagram Simulation ---")
+    print("\n--- Starting Charge Stability Diagram Simulation (using spsim package) ---")
     print(
         f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)"
     )
@@ -502,27 +174,39 @@ if __name__ == "__main__":
                 warm_start_potential = converged_potentials_map[i-1][j]
             # Could add check for (i, j-1) as well, but prioritizing one is simpler for now.
 
-            # Run the self-consistent solver
-            final_charge_density, converged_potential_V = self_consistent_solver_2d(
-                current_voltages,
-                fermi_level_J,
-                max_iter=20,
-                tol=5e-4,
-                mixing=0.1,
-                verbose=False,
-                initial_potential_V=warm_start_potential, # Use the determined warm start
-                poisson_solver_type="finite_difference",
+            # Run the self-consistent solver using spsim.simulation_runtime.sc_solver
+            sc_results = self_consistent_solver_2d(
+                voltages=current_voltages,
+                fermi_level=fermi_level_J,
+                Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
+                max_iter=20,  # From original script's call
+                tol=5e-4,    # From original script's call
+                mixing=0.1,  # From original script's call
+                verbose=True, # From original script's call
+                initial_potential_V=warm_start_potential,
+                poisson_solver_type="finite_difference", # From original script's call
+                schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
             )
 
-            if final_charge_density is not None:
-                total_electrons = calculate_total_electrons(final_charge_density)
+            # sc_results is (total_potential_J, charge_density, eigenvalues, eigenvectors_2d)
+            # or (None, None, None, None) on failure
+            if sc_results[0] is not None: # Check if total_potential_J is not None
+                total_potential_J, final_charge_density, _eigenvalues, _eigenvectors = sc_results
+                
+                # Call to spsim's calculate_total_electrons requires dx, dy
+                total_electrons = calculate_total_electrons(final_charge_density, dx, dy)
                 total_electron_map[i, j] = total_electrons # Store using original grid indices
-                converged_potentials_map[i][j] = converged_potential_V # Store converged potential
+
+                # For warm start: calculate electrostatic potential from total and external
+                current_external_potential_J = get_external_potential(X, Y, current_voltages, Lx, Ly)
+                converged_electrostatic_potential_V = (current_external_potential_J - total_potential_J) / e
+                
+                converged_potentials_map[i][j] = converged_electrostatic_potential_V
+                potential_from_previous_point = converged_electrostatic_potential_V # Update for next Hilbert point
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
-                potential_from_previous_point = converged_potential_V # Update for next Hilbert point
             else:
                 print(
-                    f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
+                    f"  -> Simulation failed for point ({i + 1},{j + 1}) using spsim. Storing NaN."
                 )
                 total_electron_map[i, j] = np.nan
                 converged_potentials_map[i][j] = None # Store None for failed points
@@ -554,26 +238,36 @@ if __name__ == "__main__":
                     f"Running point ({i + 1}/{num_v1}, {j + 1}/{num_v2}): {gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
                 )
 
-                # Run the self-consistent solver with warm start from previous point in the row
-                final_charge_density, converged_potential_V = self_consistent_solver_2d(
-                    current_voltages,
-                    fermi_level_J,
-                    max_iter=20,
-                    tol=5e-4,
-                    mixing=0.1,
-                    verbose=False,
-                    initial_potential_V=potential_from_previous_point_in_row, # Use potential from previous point in row
-                    poisson_solver_type="finite_difference",
+                # Run the self-consistent solver using spsim.simulation_runtime.sc_solver
+                sc_results = self_consistent_solver_2d(
+                    voltages=current_voltages,
+                    fermi_level=fermi_level_J,
+                    Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
+                    max_iter=20,  # From original script's call
+                    tol=5e-4,    # From original script's call
+                    mixing=0.1,  # From original script's call
+                    verbose=True, # From original script's call
+                    initial_potential_V=potential_from_previous_point_in_row,
+                    poisson_solver_type="finite_difference", # From original script's call
+                    schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
                 )
 
-                if final_charge_density is not None:
-                    total_electrons = calculate_total_electrons(final_charge_density)
+                if sc_results[0] is not None: # Check if total_potential_J is not None
+                    total_potential_J, final_charge_density, _eigenvalues, _eigenvectors = sc_results
+
+                    # Call to spsim's calculate_total_electrons requires dx, dy
+                    total_electrons = calculate_total_electrons(final_charge_density, dx, dy)
                     total_electron_map[i, j] = total_electrons
+                    
+                    # For warm start: calculate electrostatic potential from total and external
+                    current_external_potential_J = get_external_potential(X, Y, current_voltages, Lx, Ly)
+                    converged_electrostatic_potential_V = (current_external_potential_J - total_potential_J) / e
+
                     print(f"  -> Total Electrons: {total_electrons:.3f}")
-                    potential_from_previous_point_in_row = converged_potential_V # Update for next point in row
+                    potential_from_previous_point_in_row = converged_electrostatic_potential_V # Update for next point in row
                 else:
                     print(
-                        f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
+                        f"  -> Simulation failed for point ({i + 1},{j + 1}) using spsim. Storing NaN."
                     )
                     total_electron_map[i, j] = np.nan
                     # Don't update potential_from_previous_point_in_row if failed
