@@ -299,7 +299,7 @@ def get_hilbert_order(nx, ny):
     points = [(i, j) for i in range(nx) for j in range(ny)]
 
     # Calculate Hilbert distances for each point
-    distances = hilbert_curve.distances_from_coordinates(points)
+    distances = hilbert_curve.distances_from_points(points)
 
     # Sort points based on Hilbert distances
     hilbert_ordered_indices = [point for _, point in sorted(zip(distances, points))]
