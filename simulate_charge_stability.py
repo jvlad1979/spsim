@@ -453,8 +453,12 @@ if __name__ == "__main__":
     # Options: 'row_by_row', 'hilbert'
     sweep_strategy = "hilbert" # Change this to 'row_by_row' for the original behavior
 
-    # Initialize warm start potential variable
+    # Initialize warm start potential variable for Hilbert sweep
     potential_from_previous_point = None
+
+    # Initialize a map to store converged potentials for grid points
+    # Use a list of lists to store numpy arrays (potentials) or None
+    converged_potentials_map = [[None for _ in range(num_v2)] for _ in range(num_v1)]
 
     # --- Loop through sweep voltages based on strategy ---
     if sweep_strategy == "hilbert":
@@ -476,7 +480,17 @@ if __name__ == "__main__":
                 f"{gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
             )
 
-            # Run the self-consistent solver with warm start from previous Hilbert point
+            # Determine warm start potential
+            warm_start_potential = potential_from_previous_point # Default to previous Hilbert point
+
+            # Check grid neighbor (i-1, j) if available and successful
+            # This adds consideration of a direct grid neighbor
+            if i > 0 and converged_potentials_map[i-1][j] is not None:
+                # print(f"  Using grid neighbor ({i-1},{j}) as warm start.") # Optional: uncomment for debugging
+                warm_start_potential = converged_potentials_map[i-1][j]
+            # Could add check for (i, j-1) as well, but prioritizing one is simpler for now.
+
+            # Run the self-consistent solver
             final_charge_density, converged_potential_V = self_consistent_solver_2d(
                 current_voltages,
                 fermi_level_J,
@@ -484,13 +498,14 @@ if __name__ == "__main__":
                 tol=5e-4,
                 mixing=0.1,
                 verbose=False,
-                initial_potential_V=potential_from_previous_point, # Use potential from previous Hilbert point
+                initial_potential_V=warm_start_potential, # Use the determined warm start
                 poisson_solver_type="finite_difference",
             )
 
             if final_charge_density is not None:
                 total_electrons = calculate_total_electrons(final_charge_density)
                 total_electron_map[i, j] = total_electrons # Store using original grid indices
+                converged_potentials_map[i][j] = converged_potential_V # Store converged potential
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
                 potential_from_previous_point = converged_potential_V # Update for next Hilbert point
             else:
@@ -498,6 +513,7 @@ if __name__ == "__main__":
                     f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
                 )
                 total_electron_map[i, j] = np.nan
+                converged_potentials_map[i][j] = None # Store None for failed points
                 # Don't update potential_from_previous_point if failed
 
             completed_points += 1
