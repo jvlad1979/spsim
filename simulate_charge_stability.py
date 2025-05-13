@@ -475,16 +475,6 @@ if __name__ == "__main__":
 
     print("\n--- Starting Charge Stability Diagram Simulation ---")
     print(
-    ref_voltages[gate2_name] = gate2_voltages.mean()
-    initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
-    # Set Fermi level slightly above the potential minimum of the reference configuration
-    # to ensure some states are occupied within the sweep range.
-    fermi_level_J = (
-        np.min(initial_ext_pot_J) + 0.05 * e
-    )  # Example: 50 meV above min potential
-
-    print("\n--- Starting Charge Stability Diagram Simulation ---")
-    print(
         f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)"
     )
     print(
