@@ -139,7 +139,7 @@ if __name__ == "__main__":
             final_charge_density, converged_potential_V = self_consistent_solver_2d(
                 current_voltages,
                 fermi_level_J,
-                Nx, Ly, Lx, Ly, dx, dy, # Pass grid parameters
+                Nx, Ny, Lx, Ly, dx, dy, # Pass grid parameters
                 max_iter=20,
                 tol=5e-4,
                 mixing=0.1,
