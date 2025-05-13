@@ -366,8 +366,9 @@ def benchmark_sc_iteration(
 
     loop_start_time = time.time()
 
+    is_warm_start = initial_potential_V is not None
     # Initial guess for electrostatic potential (Volts)
-    if initial_potential_V is None:
+    if not is_warm_start:
         electrostatic_potential_V = np.zeros((Nx, Ny))
     else:
         electrostatic_potential_V = initial_potential_V.copy()
@@ -417,7 +418,12 @@ def benchmark_sc_iteration(
             break
 
         # 5. Mix potential for stability
-        electrostatic_potential_V += mixing * (
+        current_iter_mixing = mixing
+        if is_warm_start and i == 0: # First iteration of a warm start
+            current_iter_mixing = 0.5 # Use a more aggressive mixing for the first step
+            # print(f"  Warm start: Using aggressive mixing {current_iter_mixing} for iter 0") # Optional debug
+
+        electrostatic_potential_V += current_iter_mixing * (
             new_electrostatic_potential_V - electrostatic_potential_V
         )
     else:  # Loop finished without break (no convergence)
