@@ -13,6 +13,7 @@ import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
+import numpy.fft as fft # Added for spectral methods
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -40,6 +41,17 @@ X, Y = np.meshgrid(
     x, y, indexing="ij"
 )  # Important: 'ij' indexing matches matrix layout
 
+# --- Spectral Method Setup ---
+# Define k-space grid for spectral methods (assuming periodic boundary conditions)
+kx = 2 * np.pi * fft.fftfreq(Nx, d=dx)
+ky = 2 * np.pi * fft.fftfreq(Ny, d=dy)
+Kx, Ky = np.meshgrid(kx, ky, indexing='ij')
+K_sq = Kx**2 + Ky**2
+# Avoid division by zero at K=0 (DC component).
+# For periodic BCs, the DC component of the potential is arbitrary; setting it to 0 is common.
+# The inverse Laplacian of the DC component is undefined, so we handle it separately.
+# Replace K_sq[0,0] with a small non-zero value or handle the DC term explicitly in the solver.
+# Handling explicitly in the solver is cleaner.
 
 # --- Device Parameters ---
 def get_external_potential(X, Y, voltages):
@@ -260,6 +272,32 @@ def solve_poisson_2d(charge_density_2d):
 
     phi_2d = phi_flat.reshape((Nx, Ny), order="C")
     return phi_2d  # Electrostatic potential in Volts
+
+# --- Poisson Solver (2D) - Spectral Method ---
+def solve_poisson_2d_spectral(charge_density_2d):
+    """
+    Solves the 2D Poisson equation: laplacian(phi) = -rho / epsilon
+    Returns the 2D electrostatic potential phi (Volts).
+    Uses spectral methods (FFT) and assumes periodic boundary conditions.
+    """
+    # 1. FFT of charge density
+    rho_k = fft.fft2(charge_density_2d)
+
+    # 2. Solve in Fourier space: phi_k = -rho_k / (epsilon * K_sq)
+    # Handle the DC component (k=0,0) separately.
+    # For periodic BCs, the average potential is arbitrary.
+    # Setting phi_k[0,0] = 0 corresponds to zero average potential.
+    # Create a copy of K_sq to avoid modifying the global variable
+    K_sq_solver = K_sq.copy()
+    K_sq_solver[0, 0] = 1.0 # Set to 1 to avoid division by zero for the DC term
+
+    phi_k = -rho_k / (epsilon * K_sq_solver)
+    phi_k[0, 0] = 0.0 # Explicitly set DC component to zero
+
+    # 3. Inverse FFT to get potential in real space
+    phi_2d = fft.ifft2(phi_k).real # Take real part as potential is real
+
+    return phi_2d # Electrostatic potential in Volts
 
 
 # --- Self-Consistent Iteration (2D) ---

@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
 import os  # Added for creating output directory
+import numpy.fft as fft # Added for spectral methods
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -42,6 +43,17 @@ X, Y = np.meshgrid(
     x, y, indexing="ij"
 )  # Important: 'ij' indexing matches matrix layout
 
+# --- Spectral Method Setup ---
+# Define k-space grid for spectral methods (assuming periodic boundary conditions)
+kx = 2 * np.pi * fft.fftfreq(Nx, d=dx)
+ky = 2 * np.pi * fft.fftfreq(Ny, d=dy)
+Kx, Ky = np.meshgrid(kx, ky, indexing='ij')
+K_sq = Kx**2 + Ky**2
+# Avoid division by zero at K=0 (DC component).
+# For periodic BCs, the DC component of the potential is arbitrary; setting it to 0 is common.
+# The inverse Laplacian of the DC component is undefined, so we handle it separately.
+# Replace K_sq[0,0] with a small non-zero value or handle the DC term explicitly in the solver.
+# Handling explicitly in the solver is cleaner.
 
 # --- Device Parameters ---
 def get_external_potential(X, Y, voltages):
@@ -301,8 +313,8 @@ def self_consistent_solver_2d(
     if verbose:
         print(f"  SC loop time: {end_time_sc - start_time_sc:.2f} seconds")
 
-    # Return the last calculated charge density, even if not fully converged
-    return final_charge_density
+    # Return the last calculated charge density and the final electrostatic potential
+    return final_charge_density, converged_potential_V # Updated return value
 
 
 # --- Main Execution ---
