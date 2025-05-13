@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
 import os  # Added for creating output directory
-import numpy.fft as fft # Added for spectral methods
+import numpy.fft as fft  # Added for spectral methods
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -47,13 +47,14 @@ X, Y = np.meshgrid(
 # Define k-space grid for spectral methods (assuming periodic boundary conditions)
 kx = 2 * np.pi * fft.fftfreq(Nx, d=dx)
 ky = 2 * np.pi * fft.fftfreq(Ny, d=dy)
-Kx, Ky = np.meshgrid(kx, ky, indexing='ij')
+Kx, Ky = np.meshgrid(kx, ky, indexing="ij")
 K_sq = Kx**2 + Ky**2
 # Avoid division by zero at K=0 (DC component).
 # For periodic BCs, the DC component of the potential is arbitrary; setting it to 0 is common.
 # The inverse Laplacian of the DC component is undefined, so we handle it separately.
 # Replace K_sq[0,0] with a small non-zero value or handle the DC term explicitly in the solver.
 # Handling explicitly in the solver is cleaner.
+
 
 # --- Device Parameters ---
 def get_external_potential(X, Y, voltages):
@@ -272,15 +273,15 @@ def solve_poisson_2d_spectral(charge_density_2d):
     # Setting phi_k[0,0] = 0 corresponds to zero average potential.
     # Create a copy of K_sq to avoid modifying the global variable
     K_sq_solver = K_sq.copy()
-    K_sq_solver[0, 0] = 1.0 # Set to 1 to avoid division by zero for the DC term
+    K_sq_solver[0, 0] = 1.0  # Set to 1 to avoid division by zero for the DC term
 
     phi_k = -rho_k / (epsilon * K_sq_solver)
-    phi_k[0, 0] = 0.0 # Explicitly set DC component to zero
+    phi_k[0, 0] = 0.0  # Explicitly set DC component to zero
 
     # 3. Inverse FFT to get potential in real space
-    phi_2d = fft.ifft2(phi_k).real # Take real part as potential is real
+    phi_2d = fft.ifft2(phi_k).real  # Take real part as potential is real
 
-    return phi_2d # Electrostatic potential in Volts
+    return phi_2d  # Electrostatic potential in Volts
 
 
 # --- Self-Consistent Iteration (2D) ---
@@ -292,8 +293,8 @@ def self_consistent_solver_2d(
     tol=1e-4,
     mixing=0.1,
     verbose=False,
-    initial_potential_V=None, # Keep warm start parameter
-    poisson_solver_type="finite_difference", # Add solver type option
+    initial_potential_V=None,  # Keep warm start parameter
+    poisson_solver_type="finite_difference",  # Add solver type option
 ):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
@@ -330,7 +331,9 @@ def self_consistent_solver_2d(
         elif poisson_solver_type == "spectral":
             # Note: Spectral solver assumes periodic boundary conditions,
             # which may differ from the desired physics (Dirichlet).
-            new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
+            new_electrostatic_potential_V = solve_poisson_2d_spectral(
+                new_charge_density
+            )
         else:
             raise ValueError(f"Unknown poisson_solver_type: {poisson_solver_type}")
 
@@ -456,8 +459,8 @@ if __name__ == "__main__":
                 tol=5e-4,  # Relaxed tolerance
                 mixing=0.1,
                 verbose=False,  # Only show warnings/errors
-                initial_potential_V=potential_from_previous_point_in_row, # Pass the initial guess
-                poisson_solver_type="finite_difference", # Choose the solver here
+                initial_potential_V=potential_from_previous_point_in_row,  # Pass the initial guess
+                poisson_solver_type="finite_difference",  # Choose the solver here
             )
 
             if final_charge_density is not None:
