@@ -13,6 +13,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import time
 import numpy.fft as fft
+import random
 # import cProfile # For more detailed profiling
 
 # --- Physical Constants ---
@@ -92,11 +93,14 @@ def get_external_potential(X_grid, Y_grid, voltages):
 
 
 # --- Schrödinger Solver (2D) ---
-def solve_schrodinger_2d(potential_2d):
+def solve_schrodinger_2d(potential_2d, solver_config):
     """
-    Solves the 2D time-independent Schrödinger equation.
-    (Copied from simulate_2d_dot.py)
-    Further exploration: Test different spla.eigsh parameters (e.g., tol, maxiter if applicable).
+    Solves the 2D time-independent Schrödinger equation using a specified solver configuration.
+    (Copied from simulate_2d_dot.py and modified)
+    solver_config (dict): Configuration for the solver.
+        Example: {'method': 'eigsh', 'params': {'k': 10, 'which': 'SM'}}
+                 {'method': 'eigsh', 'params': {'k': 10, 'which': 'LM', 'use_sigma_min_potential': True}}
+                 {'method': 'lobpcg', 'params': {'k': 10, 'use_random_X': True, 'tol': 1e-5, 'maxiter': 200}}
     """
     potential_flat = potential_2d.flatten(order="C")
     diag_terms = hbar**2 / (m_eff * dx**2) + hbar**2 / (m_eff * dy**2) + potential_flat
@@ -113,17 +117,79 @@ def solve_schrodinger_2d(potential_2d):
 
     H = sp.diags(diagonals, offsets, shape=(N_total, N_total), format="csc")
 
+    method = solver_config.get('method', 'eigsh')
+    params = solver_config.get('params', {})
+    num_eigenstates = params.get('k', 10)
+
+    eigenvalues = np.array([])
+    eigenvectors_flat = np.empty((N_total, 0))
+
     try:
-        num_eigenstates = 10
-        eigenvalues, eigenvectors_flat = spla.eigsh(H, k=num_eigenstates, which="SM")
+        if method == 'eigsh':
+            eigsh_params = params.copy()
+            if eigsh_params.pop('use_sigma_min_potential', False):
+                sigma = np.min(potential_flat)
+                # Ensure sigma is not exactly an eigenvalue, or too close to cause issues (optional refinement)
+                # sigma -= 1e-9 * e # Small shift if needed
+                eigsh_params['sigma'] = sigma
+                if 'which' not in eigsh_params: # sigma requires which='LM' or 'LA' typically
+                    eigsh_params['which'] = 'LM'
+            
+            # Remove non-eigsh specific params if any were added for other types
+            eigsh_params.pop('use_random_X', None) 
+
+            eigenvalues, eigenvectors_flat = spla.eigsh(H, **eigsh_params)
+
+        elif method == 'lobpcg':
+            lobpcg_params = params.copy()
+            k_lobpcg = lobpcg_params.pop('k') # k is handled by X shape
+            
+            if lobpcg_params.pop('use_random_X', False):
+                X_init = np.random.rand(N_total, k_lobpcg)
+            else:
+                # Default to random if no other X strategy is defined for LOBPCG
+                X_init = np.random.rand(N_total, k_lobpcg)
+            
+            # LOBPCG finds largest eigenvalues by default, so use -H for smallest
+            # Or, if a version of LOBPCG supports smallest directly, use that.
+            # scipy.sparse.linalg.lobpcg has `largest=True` by default. We need smallest.
+            # A common trick is to solve for -H, or use shift-invert if possible.
+            # For simplicity, let's assume we want smallest magnitude, which LOBPCG can do with B=None, M=None.
+            # However, LOBPCG is typically for generalized eigenvalue problems or when a good preconditioner M is available.
+            # For standard Hx=ex, eigsh is often more direct for smallest.
+            # Let's try with `largest=False`.
+            
+            # Ensure 'tol' and 'maxiter' are present with defaults if not in params
+            if 'tol' not in lobpcg_params: lobpcg_params['tol'] = 1e-5
+            if 'maxiter' not in lobpcg_params: lobpcg_params['maxiter'] = N_total // 2 # Heuristic
+
+            eigenvalues, eigenvectors_flat = spla.lobpcg(H, X_init, largest=False, **lobpcg_params)
+            # Sort eigenvalues and eigenvectors as LOBPCG might not return them sorted like eigsh
+            idx_sort = np.argsort(eigenvalues)
+            eigenvalues = eigenvalues[idx_sort]
+            eigenvectors_flat = eigenvectors_flat[:, idx_sort]
+
+
+        else:
+            raise ValueError(f"Unsupported Schrödinger solver method: {method}")
+
     except Exception as exc:
-        print(f"Eigenvalue solver failed: {exc}")
+        print(f"Eigenvalue solver {method} failed: {exc}")
         return np.array([]), np.empty((Nx, Ny, 0))
 
     eigenvectors = np.zeros((Nx, Ny, num_eigenstates))
-    for i in range(num_eigenstates):
+    # Ensure we don't try to access more eigenvectors than computed, esp. if solver returned fewer than k
+    actual_computed_states = eigenvectors_flat.shape[1]
+    for i in range(min(num_eigenstates, actual_computed_states)):
         psi_flat = eigenvectors_flat[:, i]
-        norm = np.sqrt(np.sum(np.abs(psi_flat) ** 2) * dx * dy)
+        # Normalization (eigsh usually returns normalized, LOBPCG should too with B=None, M=None)
+        # Re-normalize for safety / consistency.
+        norm_sq = np.sum(np.abs(psi_flat) ** 2) * dx * dy
+        if norm_sq > 1e-12: # Avoid division by zero for zero vectors
+            norm = np.sqrt(norm_sq)
+            eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
+        else:
+            eigenvectors[:, :, i] = psi_flat.reshape((Nx, Ny), order="C") # Keep as is if norm is zero
         eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
     return eigenvalues, eigenvectors
 
@@ -229,10 +295,11 @@ def solve_poisson_2d_fem_stub(charge_density_2d):
 
 
 # --- Benchmarking Self-Consistent Solver ---
-def benchmark_sc_iteration(voltages, fermi_level, poisson_solver_func,
+def benchmark_sc_iteration(voltages, fermi_level, poisson_solver_func, schrodinger_solver_config,
                            initial_potential_V=None, max_iter=30, tol=1e-4, mixing=0.1):
     """
     Performs a self-consistent Schrödinger-Poisson calculation and benchmarks components.
+    `schrodinger_solver_config` is passed to `solve_schrodinger_2d`.
     Returns a dictionary of timings and the converged electrostatic potential.
     """
     timings = {
@@ -268,9 +335,9 @@ def benchmark_sc_iteration(voltages, fermi_level, poisson_solver_func,
 
         # 1. Solve Schrödinger equation
         sch_start_time = time.time()
-        eigenvalues, eigenvectors_2d = solve_schrodinger_2d(total_potential_J)
+        eigenvalues, eigenvectors_2d = solve_schrodinger_2d(total_potential_J, schrodinger_solver_config)
         timings["schrodinger_times_per_iter"].append(time.time() - sch_start_time)
-        if not eigenvalues.size:
+        if not eigenvalues.size or eigenvectors_2d.shape[2] == 0: # Check if any eigenvectors were returned
             print("Error in Schrödinger solver during SC iteration. Aborting.")
             timings["total_time"] = time.time() - loop_start_time
             return timings, None # Indicate failure
@@ -313,99 +380,171 @@ if __name__ == "__main__":
     print("Starting Schrödinger-Poisson Solver Benchmark Script")
     print(f"Grid: Nx={Nx}, Ny={Ny}\n")
 
-    applied_voltages_base = {
-        "P1": -0.15, "P2": -0.15, "B1": 0.10, "B2": 0.15, "B3": 0.10,
-    }
-    # For perturbed test
-    applied_voltages_perturbed = applied_voltages_base.copy()
-    applied_voltages_perturbed["P1"] -= 0.01 # Small perturbation
+    N_SAMPLES = 32 # Number of random voltage samples
+    NUM_EIGENSTATES = 10 # Default number of eigenstates to solve for
 
-    # Define Fermi level (relative to min external potential of base configuration)
-    _ext_pot_J_base = get_external_potential(X, Y, applied_voltages_base)
-    fermi_level_J = np.min(_ext_pot_J_base) + 0.02 * e  # 20 meV above min potential
+    # Define voltage ranges for random generation
+    # Gate names: "P1", "P2", "B1", "B2", "B3"
+    voltage_config = {
+        "P1": {"range": (-0.3, 0.0), "perturb_std": 0.02},
+        "P2": {"range": (-0.3, 0.0), "perturb_std": 0.02},
+        "B1": {"range": (0.0, 0.3), "perturb_std": 0.02},
+        "B2": {"range": (0.0, 0.3), "perturb_std": 0.02},
+        "B3": {"range": (0.0, 0.3), "perturb_std": 0.02},
+    }
+
+    def generate_random_voltages():
+        voltages = {}
+        for gate, config in voltage_config.items():
+            voltages[gate] = random.uniform(config["range"][0], config["range"][1])
+        return voltages
+
+    def generate_perturbed_voltages(base_voltages):
+        perturbed_voltages = {}
+        for gate, base_val in base_voltages.items():
+            perturb = random.gauss(0, voltage_config[gate]["perturb_std"])
+            perturbed_val = base_val + perturb
+            # Clamp to original range to avoid extreme values after perturbation
+            min_v, max_v = voltage_config[gate]["range"]
+            perturbed_voltages[gate] = np.clip(perturbed_val, min_v, max_v)
+        return perturbed_voltages
+
+    # Define Fermi level: For simplicity, calculate once based on 'average' expected potential
+    # This could be refined to be sample-specific if needed.
+    avg_voltages = {gate: np.mean(cfg["range"]) for gate, cfg in voltage_config.items()}
+    _ext_pot_avg = get_external_potential(X, Y, avg_voltages)
+    fermi_level_J = np.min(_ext_pot_avg) + 0.02 * e  # 20 meV above min of average potential
+
+    schrodinger_solver_configs_to_test = [
+        {"name": "eigsh_SM", "method": "eigsh", "params": {"k": NUM_EIGENSTATES, "which": "SM"}},
+        {"name": "eigsh_LM_sigma_min_pot", "method": "eigsh",
+         "params": {"k": NUM_EIGENSTATES, "which": "LM", "use_sigma_min_potential": True, "tol":1e-8}}, # Added tol for sigma mode
+        # LOBPCG can be sensitive; ensure params are well-chosen or add later.
+        # {"name": "lobpcg_randX", "method": "lobpcg",
+        #  "params": {"k": NUM_EIGENSTATES, "use_random_X": True, "tol": 1e-7, "maxiter": (Nx*Ny)//4}},
+    ]
 
     poisson_solver_methods = {
         "Finite Difference": solve_poisson_2d_fd,
         "Spectral (FFT)": solve_poisson_2d_spectral,
-        # "FEM (Stub)": solve_poisson_2d_fem_stub, # Uncomment to test stub
     }
 
-    benchmark_results = {}
+    benchmark_summary_stats = {}
 
-    for name, solver_func in poisson_solver_methods.items():
-        print(f"\n--- Benchmarking Poisson Solver: {name} ---")
-        benchmark_results[name] = {}
+    def calculate_stats(timings_list):
+        if not timings_list:
+            # Ensure all expected keys are present even for empty lists
+            stat_keys = ["iterations", "total_time", "ext_potential_time", 
+                         "schrodinger_time_avg", "charge_calc_time_avg", "poisson_time_avg"]
+            return {key: {"mean": np.nan, "std": np.nan, "count": 0, "converged_count":0} for key in stat_keys}
 
-        # 1. Cold Start
-        print("Running: Cold Start (Base Voltages)")
-        try:
-            timings_cold, potential_cold = benchmark_sc_iteration(
-                applied_voltages_base, fermi_level_J, solver_func
-            )
-            benchmark_results[name]["cold_start"] = timings_cold
-            if not timings_cold["converged"]: potential_cold = None # Ensure no warm start if cold failed
-        except NotImplementedError as e:
-            print(f"Skipping {name} due to: {e}")
-            benchmark_results[name]["cold_start"] = {"error": str(e)}
-            potential_cold = None # Cannot proceed with this solver
-            continue # Skip to next solver
-        except Exception as e:
-            print(f"Error during cold start for {name}: {e}")
-            benchmark_results[name]["cold_start"] = {"error": str(e)}
-            potential_cold = None
-            continue
+        stats = {}
+        # converged_count is based on the number of items in timings_list, assuming only converged runs are added
+        converged_runs = len(timings_list)
+
+        for key in timings_list[0].keys(): # Use keys from the first valid timing dict
+            if key.endswith("_per_iter") or key == "converged": # Skip these raw lists or boolean
+                continue
+            
+            values = [d[key] for d in timings_list if isinstance(d.get(key), (int, float))]
+            if values:
+                stats[key] = {"mean": np.mean(values), "std": np.std(values), "count": len(values), "converged_count": converged_runs}
+            else: # Should not happen if timings_list is not empty and contains valid numbers
+                stats[key] = {"mean": np.nan, "std": np.nan, "count": 0, "converged_count": converged_runs}
+        return stats
+
+    for sch_config in schrodinger_solver_configs_to_test:
+        sch_name = sch_config['name']
+        benchmark_summary_stats[sch_name] = {}
+        for poisson_name, poisson_solver_func in poisson_solver_methods.items():
+            print(f"\n--- Benchmarking Schrödinger: {sch_name} | Poisson: {poisson_name} ---")
+            current_config_stats = {}
+
+            # --- Scenario 1: Random Voltages (Cold Starts) ---
+            print(f"  Running Scenario: {N_SAMPLES} Random Cold Starts")
+            cold_start_run_timings = []
+            for i_sample in range(N_SAMPLES):
+                random_voltages = generate_random_voltages()
+                timings, _ = benchmark_sc_iteration(
+                    random_voltages, fermi_level_J, poisson_solver_func,
+                    schrodinger_solver_config=sch_config,
+                    initial_potential_V=None
+                )
+                if timings["converged"]:
+                    cold_start_run_timings.append(timings)
+                # else:
+                #     print(f"    Sample {i_sample+1} (Cold) for {sch_name}/{poisson_name} did not converge.")
+            current_config_stats["random_cold_starts"] = calculate_stats(cold_start_run_timings)
+            num_converged_cold = len(cold_start_run_timings)
+            print(f"    Converged {num_converged_cold}/{N_SAMPLES} times for Random Cold Starts.")
 
 
-        # 2. Warm Start (Same Voltages)
-        if potential_cold is not None:
-            print("Running: Warm Start (Base Voltages, using converged potential from cold start)")
-            timings_warm_same_V, _ = benchmark_sc_iteration(
-                applied_voltages_base, fermi_level_J, solver_func,
-                initial_potential_V=potential_cold
-            )
-            benchmark_results[name]["warm_start_same_V"] = timings_warm_same_V
-        else:
-            print("Skipping: Warm Start (Same Voltages) due to failed cold start.")
-            benchmark_results[name]["warm_start_same_V"] = {"skipped": "Cold start failed"}
+            # --- Scenario 2: Perturbed Warm Starts ---
+            print(f"  Running Scenario: {N_SAMPLES} Perturbed Warm Starts")
+            perturbed_warm_start_run_timings = []
+            converged_perturbed_warm = 0
+            for i_sample in range(N_SAMPLES):
+                base_random_voltages = generate_random_voltages()
+                base_timings, potential_base = benchmark_sc_iteration(
+                    base_random_voltages, fermi_level_J, poisson_solver_func,
+                    schrodinger_solver_config=sch_config,
+                    initial_potential_V=None
+                )
+                if base_timings["converged"] and potential_base is not None:
+                    perturbed_voltages = generate_perturbed_voltages(base_random_voltages)
+                    timings_perturbed, _ = benchmark_sc_iteration(
+                        perturbed_voltages, fermi_level_J, poisson_solver_func,
+                        schrodinger_solver_config=sch_config,
+                        initial_potential_V=potential_base
+                    )
+                    if timings_perturbed["converged"]:
+                        perturbed_warm_start_run_timings.append(timings_perturbed)
+                        converged_perturbed_warm +=1
+                    # else:
+                    #     print(f"    Sample {i_sample+1} (Perturbed Warm) for {sch_name}/{poisson_name} did not converge.")
+                # else:
+                #     print(f"    Sample {i_sample+1} (Base for Perturbed Warm) for {sch_name}/{poisson_name} did not converge. Skipping perturbed run.")
+            current_config_stats["perturbed_warm_starts"] = calculate_stats(perturbed_warm_start_run_timings)
+            print(f"    Converged {converged_perturbed_warm}/{N_SAMPLES} times for Perturbed Warm Starts (after base converged).")
+            
+            benchmark_summary_stats[sch_name][poisson_name] = current_config_stats
+            if not cold_start_run_timings and not perturbed_warm_start_run_timings: # Handle cases where a solver fails completely
+                 if poisson_solver_methods[poisson_name] == solve_poisson_2d_fem_stub: # Check if it's the stub
+                    print(f"    FEM Poisson solver is a stub and was skipped as expected.")
 
-        # 3. Warm Start (Perturbed Voltages)
-        if potential_cold is not None: # Use potential from original base voltage cold start
-            print("Running: Warm Start (Perturbed Voltages, using converged potential from base cold start)")
-            timings_warm_pert_V, _ = benchmark_sc_iteration(
-                applied_voltages_perturbed, fermi_level_J, solver_func,
-                initial_potential_V=potential_cold
-            )
-            benchmark_results[name]["warm_start_perturbed_V"] = timings_warm_pert_V
-        else:
-            print("Skipping: Warm Start (Perturbed Voltages) due to failed cold start.")
-            benchmark_results[name]["warm_start_perturbed_V"] = {"skipped": "Cold start failed"}
 
     # --- Print Summary of Results ---
-    print("\n\n--- Benchmark Summary ---")
-    for method_name, results in benchmark_results.items():
-        print(f"\nPoisson Method: {method_name}")
-        for test_type, timings in results.items():
-            if "error" in timings or "skipped" in timings:
-                status = timings.get("error", timings.get("skipped", "Unknown issue"))
-                print(f"  {test_type.replace('_', ' ').title()}: {status}")
-                continue
+    print("\n\n--- Benchmark Statistics Summary ---")
+    for sch_name, poisson_results in benchmark_summary_stats.items():
+        print(f"\nSchrödinger Solver Configuration: {sch_name}")
+        for poisson_name, scenario_results in poisson_results.items():
+            print(f"  Poisson Solver: {poisson_name}")
+            for scenario_name, stats_dict in scenario_results.items():
+                print(f"    Scenario: {scenario_name.replace('_', ' ').title()}")
+                if not stats_dict or stats_dict["iterations"]["count"] == 0 : # Check if any samples contributed
+                    print(f"      No successful runs to report statistics.")
+                    if stats_dict and "converged_count" in stats_dict["iterations"]:
+                         print(f"      (Converged {stats_dict['iterations']['converged_count']}/{N_SAMPLES} samples)")
+                    continue
+                
+                conv_count = stats_dict["iterations"]["converged_count"]
+                print(f"      Converged Samples: {conv_count}/{N_SAMPLES}")
+                if conv_count > 0:
+                    for metric, values in stats_dict.items():
+                        if "converged_count" in values: # Already printed
+                            pass
+                        print(f"      Avg {metric.replace('_', ' ').title()}: {values['mean']:.3f} s (std: {values['std']:.3f})")
+                        if metric == "iterations": # Iterations is not time
+                             print(f"      Avg {metric.replace('_', ' ').title()}: {values['mean']:.1f} (std: {values['std']:.1f})")
 
-            print(f"  {test_type.replace('_', ' ').title()}:")
-            if "converged" in timings:
-                 print(f"    Converged: {timings['converged']} in {timings['iterations']} iterations")
-            print(f"    Total Time: {timings['total_time']:.3f} s")
-            if timings.get('ext_potential_time', 0) > 0: # Only for first call in a series
-                 print(f"    Ext. Potential Calc Time: {timings['ext_potential_time']:.3f} s")
-            print(f"    Avg Schrödinger Time: {timings['schrodinger_time_avg']:.3f} s/iter")
-            print(f"    Avg Charge Calc Time: {timings['charge_calc_time_avg']:.3f} s/iter")
-            print(f"    Avg Poisson Time: {timings['poisson_time_avg']:.3f} s/iter")
 
     print("\n--- Notes ---")
-    print("1. 'Avg Time' is per self-consistent iteration.")
-    print("2. Spectral method uses periodic BCs; Finite Difference uses Dirichlet phi=0.")
-    print("3. For more detailed profiling of specific functions, consider using cProfile:")
+    print(f"1. Statistics are based on {N_SAMPLES} random voltage samples per scenario.")
+    print("2. 'Avg Time' is per self-consistent iteration for schrodinger_time_avg, charge_calc_time_avg, poisson_time_avg.")
+    print("3. Spectral Poisson method uses periodic BCs; Finite Difference uses Dirichlet phi=0.")
+    print("4. For more detailed profiling of specific functions, consider using cProfile:")
     print("   Example: python -m cProfile -s cumtime benchmark_solver_schemes.py")
-    print("4. To test different Schrödinger solvers: modify 'solve_schrodinger_2d' or its parameters.")
     print("5. To implement FEM: replace 'solve_poisson_2d_fem_stub' with a working FEM solver.")
+    print("6. Schrödinger solver 'tol' and 'maxiter' can be tuned within 'schrodinger_solver_configs_to_test'.")
 
     print("\nBenchmark script finished.")
