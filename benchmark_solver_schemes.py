@@ -190,7 +190,6 @@ def solve_schrodinger_2d(potential_2d, solver_config):
             eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
         else:
             eigenvectors[:, :, i] = psi_flat.reshape((Nx, Ny), order="C") # Keep as is if norm is zero
-        eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
     return eigenvalues, eigenvectors
 
 
