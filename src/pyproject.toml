@@ -24,6 +24,6 @@ dev = ["pytest"]
 quantum_dot_sim = "quantum_dot_sim.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["quantum_dot_sim"]
-include = ["*"]
+where = ["src"]
+include = ["quantum_dot_sim*"]
 namespaces = false
