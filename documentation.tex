@@ -93,12 +93,13 @@ The scripts model the gates using 2D (or 1D in \texttt{simulate\_1d\_dot.py}) Ga
     \begin{tikzpicture}[scale=0.8]
         % Simulation domain boundary
         \draw (0,0) rectangle (6,4);
-        \node[below left] at (0,0) {}; % Remove coordinate label
-        \node[above right] at (6,4) {}; % Remove coordinate label
+        % Remove coordinate labels
+        % node[below left] at (0,0) {};
+        % node[above right] at (6,4) {};
 
-        % Add axis labels
-        \node[below=2pt] at (3,0) {x};
-        \node[left=2pt] at (0,2) {y};
+        % Add axis labels, slightly further out
+        \node[below=4pt] at (3,0) {x};
+        \node[left=4pt] at (0,2) {y};
         \draw[->] (0,0) -- (6.2,0); % x-axis arrow
         \draw[->] (0,0) -- (0,4.2); % y-axis arrow
 
@@ -123,7 +124,7 @@ The scripts model the gates using 2D (or 1D in \texttt{simulate\_1d\_dot.py}) Ga
         \draw[orange, dotted, thick] (5.1, 2.0) ellipse (1.2 and 1.2); \node[above=2pt] at (5.1, 2.0) {B3};
 
         % Indicate approximate dot locations (potential minima)
-        % Use slightly larger nodes for visibility
+        % Use slightly larger nodes for visibility, adjust positioning
         \node[draw, circle, inner sep=3pt, fill=blue!30, thick] at (2.5, 2.0) {}; \node[below=2pt] at (2.5, 2.0) {Dot 1};
         \node[draw, circle, inner sep=3pt, fill=cyan!30, thick] at (3.5, 2.0) {}; \node[below=2pt] at (3.5, 2.0) {Dot 2};
 
@@ -131,8 +132,8 @@ The scripts model the gates using 2D (or 1D in \texttt{simulate\_1d\_dot.py}) Ga
         \draw[<->, thick] (0, -0.5) -- (6, -0.5) node[midway, below=2pt] {Lx (150 nm)};
         \draw[<->, thick] (-0.5, 0) -- (-0.5, 4) node[midway, left=2pt] {Ly (100 nm)};
 
-        % Add a simple legend
-        \node[below right, inner sep=5pt, draw, thick, anchor=south east] at (6,-0.5) { % Position legend below and to the right
+        % Add a simple legend, position it clearly outside the main box
+        \node[below right, inner sep=5pt, draw, thick, anchor=north east] at (6,-1) { % Adjusted position and anchor
             \begin{tabular}{ll}
                 \tikz{\draw[blue, dashed, thick] (0,0) -- (0.5,0);} & Plunger Gate \\
                 \tikz{\draw[red, dotted, thick] (0,0) -- (0.5,0);} & Barrier Gate \\
