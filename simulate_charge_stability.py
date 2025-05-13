@@ -13,7 +13,7 @@ import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
-import os # Added for creating output directory
+import os  # Added for creating output directory
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -165,12 +165,13 @@ def calculate_charge_density_2d(eigenvalues, eigenvectors_2d, fermi_level):
 
     for i in range(num_states):
         if eigenvalues[i] < fermi_level:
-            density_2d += 2 * np.abs(eigenvectors_2d[:, :, i]) ** 2 # Factor 2 for spin
+            density_2d += 2 * np.abs(eigenvectors_2d[:, :, i]) ** 2  # Factor 2 for spin
         else:
             break
 
     charge_density_2d = -e * density_2d  # Coulombs per square meter (C/m^2)
     return charge_density_2d
+
 
 # --- Total Electron Number Calculation ---
 def calculate_total_electrons(charge_density_2d):
@@ -179,6 +180,7 @@ def calculate_total_electrons(charge_density_2d):
     total_charge = np.sum(charge_density_2d * dx * dy)
     total_electrons = total_charge / (-e)
     return total_electrons
+
 
 # --- Poisson Solver (2D) ---
 # (Identical to simulate_2d_dot.py - no changes needed here)
@@ -241,7 +243,9 @@ def solve_poisson_2d(charge_density_2d):
 
 # --- Self-Consistent Iteration (2D) ---
 # (Modified slightly for stability diagram context)
-def self_consistent_solver_2d(voltages, fermi_level, max_iter=30, tol=1e-4, mixing=0.1, verbose=False):
+def self_consistent_solver_2d(
+    voltages, fermi_level, max_iter=30, tol=1e-4, mixing=0.1, verbose=False
+):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
     Returns the final charge density.
@@ -253,7 +257,7 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=30, tol=1e-4, mixi
     electrostatic_potential_V = np.zeros((Nx, Ny))
     external_potential_J = get_external_potential(X, Y, voltages)
 
-    final_charge_density = None # Initialize in case of early exit
+    final_charge_density = None  # Initialize in case of early exit
 
     for i in range(max_iter):
         total_potential_J = external_potential_J - e * electrostatic_potential_V
@@ -261,12 +265,12 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=30, tol=1e-4, mixi
 
         if not eigenvalues.size:
             print("Error in Schrödinger solver. Aborting SC loop.")
-            return None # Indicate failure
+            return None  # Indicate failure
 
         new_charge_density = calculate_charge_density_2d(
             eigenvalues, eigenvectors_2d, fermi_level
         )
-        final_charge_density = new_charge_density # Store the latest density
+        final_charge_density = new_charge_density  # Store the latest density
 
         new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
 
@@ -274,8 +278,10 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=30, tol=1e-4, mixi
             new_electrostatic_potential_V - electrostatic_potential_V
         ) * np.sqrt(dx * dy)
 
-        if verbose and (i % 5 == 0 or i == max_iter - 1): # Print progress less often
-             print(f"  SC Iter {i + 1}/{max_iter}, Potential diff norm: {potential_diff_norm:.3e}")
+        if verbose and (i % 5 == 0 or i == max_iter - 1):  # Print progress less often
+            print(
+                f"  SC Iter {i + 1}/{max_iter}, Potential diff norm: {potential_diff_norm:.3e}"
+            )
 
         if potential_diff_norm < tol:
             if verbose:
@@ -287,7 +293,9 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=30, tol=1e-4, mixi
             new_electrostatic_potential_V - electrostatic_potential_V
         )
     else:
-        print(f"Warning: SC loop did not converge after {max_iter} iterations for {voltages}.")
+        print(
+            f"Warning: SC loop did not converge after {max_iter} iterations for {voltages}."
+        )
 
     end_time_sc = time.time()
     if verbose:
@@ -312,27 +320,33 @@ if __name__ == "__main__":
     gate1_name = "P1"
     gate2_name = "P2"
     # Define voltage ranges for the sweep (adjust for desired charge transitions)
-    gate1_voltages = np.linspace(-0.3, 0.0, 21) # Coarser sweep for speed
-    gate2_voltages = np.linspace(-0.3, 0.0, 21) # Coarser sweep for speed
+    gate1_voltages = np.linspace(-0.15, 0.0, 121)  # Coarser sweep for speed
+    gate2_voltages = np.linspace(-0.15, 0.0, 121)  # Coarser sweep for speed
     num_v1 = len(gate1_voltages)
     num_v2 = len(gate2_voltages)
 
     # Array to store results (total electron number)
-    total_electron_map = np.full((num_v1, num_v2), np.nan) # Use NaN for failed points
+    total_electron_map = np.full((num_v1, num_v2), np.nan)  # Use NaN for failed points
 
     # Define Fermi level (relative to minimum external potential of a reference state)
     # Calculate based on a typical operating point, keep constant during sweep.
     ref_voltages = base_voltages.copy()
-    ref_voltages[gate1_name] = gate1_voltages.mean() # Use mid-range voltage
+    ref_voltages[gate1_name] = gate1_voltages.mean()  # Use mid-range voltage
     ref_voltages[gate2_name] = gate2_voltages.mean()
     initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
     # Set Fermi level slightly above the potential minimum of the reference configuration
     # to ensure some states are occupied within the sweep range.
-    fermi_level_J = np.min(initial_ext_pot_J) + 0.05 * e # Example: 50 meV above min potential
+    fermi_level_J = (
+        np.min(initial_ext_pot_J) + 0.05 * e
+    )  # Example: 50 meV above min potential
 
     print("\n--- Starting Charge Stability Diagram Simulation ---")
-    print(f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)")
-    print(f"Sweeping {gate2_name} from {gate2_voltages[0]:.3f} V to {gate2_voltages[-1]:.3f} V ({num_v2} points)")
+    print(
+        f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)"
+    )
+    print(
+        f"Sweeping {gate2_name} from {gate2_voltages[0]:.3f} V to {gate2_voltages[-1]:.3f} V ({num_v2} points)"
+    )
     print(f"Grid size: Nx={Nx}, Ny={Ny}")
     print(f"Fermi Level: {fermi_level_J / e:.4f} eV")
     print("-" * 50)
@@ -353,17 +367,19 @@ if __name__ == "__main__":
             current_voltages[gate1_name] = v1
             current_voltages[gate2_name] = v2
 
-            print(f"Running point ({i+1}/{num_v1}, {j+1}/{num_v2}): {gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V")
+            print(
+                f"Running point ({i + 1}/{num_v1}, {j + 1}/{num_v2}): {gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
+            )
 
             # Run the self-consistent solver
             # Reduce verbosity inside the loop, reduce max_iter/tol for speed
             final_charge_density = self_consistent_solver_2d(
                 current_voltages,
                 fermi_level_J,
-                max_iter=20, # Reduced iterations
-                tol=5e-4,    # Relaxed tolerance
+                max_iter=20,  # Reduced iterations
+                tol=5e-4,  # Relaxed tolerance
                 mixing=0.1,
-                verbose=False # Only show warnings/errors
+                verbose=False,  # Only show warnings/errors
             )
 
             if final_charge_density is not None:
@@ -372,29 +388,38 @@ if __name__ == "__main__":
                 total_electron_map[i, j] = total_electrons
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
             else:
-                print(f"  -> Simulation failed for point ({i+1},{j+1}). Storing NaN.")
-                total_electron_map[i, j] = np.nan # Mark as failed
+                print(
+                    f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
+                )
+                total_electron_map[i, j] = np.nan  # Mark as failed
 
             completed_points += 1
             point_end_time = time.time()
             elapsed_time = point_end_time - sweep_start_time
             time_per_point = elapsed_time / completed_points
             estimated_remaining = (total_points - completed_points) * time_per_point
-            print(f"  Point time: {point_end_time - point_start_time:.2f}s. Est. remaining: {estimated_remaining:.1f}s")
-
+            print(
+                f"  Point time: {point_end_time - point_start_time:.2f}s. Est. remaining: {estimated_remaining:.1f}s"
+            )
 
     sweep_end_time = time.time()
     print("-" * 50)
-    print(f"Stability diagram simulation finished in {sweep_end_time - sweep_start_time:.2f} seconds.")
+    print(
+        f"Stability diagram simulation finished in {sweep_end_time - sweep_start_time:.2f} seconds."
+    )
 
     # Save the raw data
-    data_filename = os.path.join(output_dir, f"stability_data_{gate1_name}_{gate2_name}.npz")
-    np.savez(data_filename,
-             gate1_voltages=gate1_voltages,
-             gate2_voltages=gate2_voltages,
-             total_electron_map=total_electron_map,
-             base_voltages=base_voltages,
-             fermi_level_J=fermi_level_J)
+    data_filename = os.path.join(
+        output_dir, f"stability_data_{gate1_name}_{gate2_name}.npz"
+    )
+    np.savez(
+        data_filename,
+        gate1_voltages=gate1_voltages,
+        gate2_voltages=gate2_voltages,
+        total_electron_map=total_electron_map,
+        base_voltages=base_voltages,
+        fermi_level_J=fermi_level_J,
+    )
     print(f"Raw data saved to {data_filename}")
 
     # --- Plotting Charge Stability Diagram ---
@@ -403,15 +428,15 @@ if __name__ == "__main__":
 
     # Use pcolormesh for better handling of grid boundaries
     # Need meshgrid for pcolormesh coordinates
-    V1, V2 = np.meshgrid(gate1_voltages, gate2_voltages, indexing='ij')
+    V1, V2 = np.meshgrid(gate1_voltages, gate2_voltages, indexing="ij")
     # Transpose map because pcolormesh expects Z[j, i] for X[i], Y[j] if shading='flat' or similar issues
-    plot_data = total_electron_map # Keep as [i, j] corresponding to V1[i], V2[j]
+    plot_data = total_electron_map  # Keep as [i, j] corresponding to V1[i], V2[j]
 
     # Handle potential NaN values if desired (e.g., set to a specific color)
-    plot_data_masked = np.ma.masked_invalid(plot_data) # Mask NaN values
+    plot_data_masked = np.ma.masked_invalid(plot_data)  # Mask NaN values
 
     cmap = plt.cm.viridis
-    cmap.set_bad(color='grey') # Color for NaN values
+    cmap.set_bad(color="grey")  # Color for NaN values
 
     # Determine reasonable color limits, focusing on integer transitions
     min_electrons = np.nanmin(plot_data)
@@ -419,19 +444,23 @@ if __name__ == "__main__":
     cmin = np.floor(min_electrons) - 0.5 if not np.isnan(min_electrons) else -0.5
     cmax = np.ceil(max_electrons) + 0.5 if not np.isnan(max_electrons) else 1.5
 
-    pcm = plt.pcolormesh(V1, V2, plot_data_masked, cmap=cmap, shading='auto', vmin=cmin, vmax=cmax)
-    plt.colorbar(pcm, label='Total Number of Electrons')
+    pcm = plt.pcolormesh(
+        V1, V2, plot_data_masked, cmap=cmap, shading="auto", vmin=cmin, vmax=cmax
+    )
+    plt.colorbar(pcm, label="Total Number of Electrons")
 
     plt.xlabel(f"Gate Voltage {gate1_name} (V)")
     plt.ylabel(f"Gate Voltage {gate2_name} (V)")
     plt.title(f"Charge Stability Diagram (Total Electrons)\nFixed: {base_voltages}")
-    plt.grid(True, linestyle=':', alpha=0.5)
-    plt.axis('tight') # Adjust axes to fit data
+    plt.grid(True, linestyle=":", alpha=0.5)
+    plt.axis("tight")  # Adjust axes to fit data
 
-    plot_filename = os.path.join(output_dir, f"charge_stability_{gate1_name}_{gate2_name}.png")
+    plot_filename = os.path.join(
+        output_dir, f"charge_stability_{gate1_name}_{gate2_name}.png"
+    )
     plt.savefig(plot_filename)
     print(f"Charge stability plot saved to {plot_filename}")
-    plt.show() # Force plot to display
+    plt.show()  # Force plot to display
 
     # Optional: Plot rounded electron numbers to emphasize plateaus
     try:
@@ -440,25 +469,48 @@ if __name__ == "__main__":
         rounded_electrons_masked = np.ma.masked_invalid(rounded_electrons)
         # Use discrete colormap or levels for integer steps
         n_levels = int(np.nanmax(rounded_electrons) - np.nanmin(rounded_electrons)) + 1
-        levels = np.arange(np.floor(np.nanmin(rounded_electrons)), np.ceil(np.nanmax(rounded_electrons)) + 1) - 0.5
+        levels = (
+            np.arange(
+                np.floor(np.nanmin(rounded_electrons)),
+                np.ceil(np.nanmax(rounded_electrons)) + 1,
+            )
+            - 0.5
+        )
         # Use plt.colormaps.get_cmap instead of plt.cm.get_cmap
-        cmap_discrete = plt.colormaps.get_cmap('viridis', n_levels if n_levels > 0 else 1)
-        cmap_discrete.set_bad(color='grey')
+        cmap_discrete = plt.colormaps.get_cmap(
+            "viridis", n_levels if n_levels > 0 else 1
+        )
+        cmap_discrete.set_bad(color="grey")
 
-        pcm_rounded = plt.pcolormesh(V1, V2, rounded_electrons_masked, cmap=cmap_discrete, shading='auto', vmin=levels.min(), vmax=levels.max())
-        cbar = plt.colorbar(pcm_rounded, label='Rounded Total Electrons', ticks=np.round(levels[:-1]+0.5)) # Ticks at integers
+        pcm_rounded = plt.pcolormesh(
+            V1,
+            V2,
+            rounded_electrons_masked,
+            cmap=cmap_discrete,
+            shading="auto",
+            vmin=levels.min(),
+            vmax=levels.max(),
+        )
+        cbar = plt.colorbar(
+            pcm_rounded,
+            label="Rounded Total Electrons",
+            ticks=np.round(levels[:-1] + 0.5),
+        )  # Ticks at integers
         # cbar.set_ticks(np.arange(int(np.nanmin(rounded_electrons)), int(np.nanmax(rounded_electrons)) + 1))
-
 
         plt.xlabel(f"Gate Voltage {gate1_name} (V)")
         plt.ylabel(f"Gate Voltage {gate2_name} (V)")
-        plt.title(f"Charge Stability Diagram (Rounded Total Electrons)\nFixed: {base_voltages}")
-        plt.grid(True, linestyle=':', alpha=0.5)
-        plt.axis('tight')
+        plt.title(
+            f"Charge Stability Diagram (Rounded Total Electrons)\nFixed: {base_voltages}"
+        )
+        plt.grid(True, linestyle=":", alpha=0.5)
+        plt.axis("tight")
 
-        plot_filename_rounded = os.path.join(output_dir, f"charge_stability_rounded_{gate1_name}_{gate2_name}.png")
+        plot_filename_rounded = os.path.join(
+            output_dir, f"charge_stability_rounded_{gate1_name}_{gate2_name}.png"
+        )
         plt.savefig(plot_filename_rounded)
-        plt.show() # Force plot to display
+        plt.show()  # Force plot to display
         print(f"Rounded charge stability plot saved to {plot_filename_rounded}")
 
     except Exception as e:
