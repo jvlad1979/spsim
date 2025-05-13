@@ -97,6 +97,7 @@ def self_consistent_solver_2d(
 
     for i in range(max_iter):
         iter_start_time = time.time()
+        iter_start_time = time.time()
         if verbose:
             print(f"Iteration {i + 1}/{max_iter}")
 
@@ -112,6 +113,14 @@ def self_consistent_solver_2d(
             print("Error in Schrödinger solver. Aborting SC loop.")
             # Return the last successful results if any, otherwise None
             return last_successful_results
+
+        # Add print statement to check energy levels vs Fermi level
+        if verbose:
+            if eigenvalues.size > 0:
+                print(f"  Min Eigenvalue: {eigenvalues[0]/e:.4f} eV, Fermi Level: {fermi_level/e:.4f} eV")
+            else:
+                print("  No eigenvalues found.")
+
 
         # 3. Calculate charge density
         new_charge_density = calculate_charge_density_2d(
