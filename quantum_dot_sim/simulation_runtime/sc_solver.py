@@ -4,7 +4,7 @@ import time
 from ..constants import e # Import elementary charge
 from ..device.potential import get_external_potential # Import external potential function
 from ..solvers.schrodinger import solve_schrodinger_2d # Import Schrödinger solver
-from ..solvers.poisson import solve_poisson_2d_fd, solve_poisson_2d_spectral # Import Poisson solvers
+from ..solvers.poisson import solve_poisson_2d_fd, solve_poisson_2d_spectral, solve_poisson_2d_fem_stub # Import Poisson solvers
 from .charge_density import calculate_charge_density_2d # Import charge density calculation
 
 def self_consistent_solver_2d(
