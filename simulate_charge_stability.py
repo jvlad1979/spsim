@@ -297,6 +297,8 @@ def self_consistent_solver_2d(
     external_potential_J = get_external_potential(X, Y, voltages)
 
     final_charge_density = None  # Initialize in case of early exit
+    # Initialize converged_potential_V with the initial guess or zero potential
+    converged_potential_V = electrostatic_potential_V.copy()
 
     for i in range(max_iter):
         total_potential_J = external_potential_J - e * electrostatic_potential_V
@@ -304,14 +306,17 @@ def self_consistent_solver_2d(
 
         if not eigenvalues.size:
             print("Error in Schrödinger solver. Aborting SC loop.")
-            return None  # Indicate failure
+            return None, None  # Indicate failure by returning None for both values
 
         new_charge_density = calculate_charge_density_2d(
             eigenvalues, eigenvectors_2d, fermi_level
         )
         final_charge_density = new_charge_density  # Store the latest density
 
+        # Use the finite difference Poisson solver for now
         new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
+        # If you wanted to use the spectral solver, you would uncomment the line below
+        # new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
 
         potential_diff_norm = np.linalg.norm(
             new_electrostatic_potential_V - electrostatic_potential_V
@@ -340,8 +345,11 @@ def self_consistent_solver_2d(
     if verbose:
         print(f"  SC loop time: {end_time_sc - start_time_sc:.2f} seconds")
 
+    # Assign the final electrostatic potential before returning
+    converged_potential_V = electrostatic_potential_V
+
     # Return the last calculated charge density and the final electrostatic potential
-    return final_charge_density, converged_potential_V # Updated return value
+    return final_charge_density, converged_potential_V
 
 
 # --- Main Execution ---
