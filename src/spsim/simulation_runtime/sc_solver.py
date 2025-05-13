@@ -91,12 +91,13 @@ def self_consistent_solver_2d(
     # mixing_decay_rate = 0.9
     # previous_potential_diff_norm = float('inf')
 
-    # Store the last successful results in case of non-convergence
-    last_successful_results = (None, None, None, None)
+    # Initialize variables to store the final results
+    final_charge_density = None
+    # Initialize final_electrostatic_potential_V with the initial guess or zero potential
+    final_electrostatic_potential_V = electrostatic_potential_V.copy()
 
 
     for i in range(max_iter):
-        iter_start_time = time.time()
         iter_start_time = time.time()
         if verbose:
             print(f"Iteration {i + 1}/{max_iter}")
@@ -111,21 +112,21 @@ def self_consistent_solver_2d(
         )
         if not eigenvalues.size or eigenvectors_2d.shape[2] == 0:
             print("Error in Schrödinger solver. Aborting SC loop.")
-            # Return the last successful results if any, otherwise None
-            return last_successful_results
+            # Return None for charge density and the current potential on failure
+            return None, electrostatic_potential_V
 
-        # Add print statement to check energy levels vs Fermi level
         if verbose:
             if eigenvalues.size > 0:
                 print(f"  Min Eigenvalue: {eigenvalues[0]/e:.4f} eV, Fermi Level: {fermi_level/e:.4f} eV")
             else:
                 print("  No eigenvalues found.")
 
-
         # 3. Calculate charge density
         new_charge_density = calculate_charge_density_2d(
             eigenvalues, eigenvectors_2d, fermi_level
         )
+        # Update final charge density candidate
+        final_charge_density = new_charge_density
 
         # 4. Solve Poisson equation
         # Pass grid info to the solver
@@ -139,19 +140,14 @@ def self_consistent_solver_2d(
         if verbose:
             print(f"  Potential difference norm: {potential_diff_norm:.3e}")
 
-        # Store results from this iteration as potentially the last successful one
-        last_successful_results = (
-             total_potential_J,
-             new_charge_density, # Use new_charge_density as it's based on current states
-             eigenvalues,
-             eigenvectors_2d,
-        )
-
+        # Update final potential candidate (potential before mixing)
+        final_electrostatic_potential_V = new_electrostatic_potential_V
 
         if potential_diff_norm < tol:
             if verbose:
                 print(f"Converged after {i + 1} iterations.")
-            electrostatic_potential_V = new_electrostatic_potential_V # Final update
+            # If converged, the final potential is new_electrostatic_potential_V
+            final_electrostatic_potential_V = new_electrostatic_potential_V
             break
 
         # 6. Mix potential for stability
@@ -159,14 +155,8 @@ def self_consistent_solver_2d(
         electrostatic_potential_V = electrostatic_potential_V + mixing * (
             new_electrostatic_potential_V - electrostatic_potential_V
         )
-
-        # Adaptive mixing logic could be added here based on potential_diff_norm
-        # if i > 0 and potential_diff_norm > previous_potential_diff_norm:
-        #     mixing *= mixing_decay_rate
-        #     if mixing < min_mixing:
-        #         mixing = min_mixing
-        #     if verbose: print(f"  Reducing mixing parameter to {mixing:.3f}")
-        # previous_potential_diff_norm = potential_diff_norm
+        # After mixing, electrostatic_potential_V is the potential for the next iteration.
+        # If the loop finishes without converging, this will be the final potential.
 
 
         if verbose:
@@ -175,22 +165,20 @@ def self_consistent_solver_2d(
 
     else:  # Loop finished without break
         print(f"Warning: Did not converge after {max_iter} iterations.")
-        # Return the last successful results if the loop finished without converging
-        # This might be partially converged results.
         end_time = time.time()
         if verbose:
              print(f"Total self-consistent loop time: {end_time - start_time:.2f} seconds (Non-converged).")
-        return last_successful_results
+        # If not converged, the final potential is the result of the last mixing step.
+        final_electrostatic_potential_V = electrostatic_potential_V
 
 
-    # If converged, ensure the returned potential and density are from the final iteration
-    # The last_successful_results were updated inside the loop, so they hold the final state upon break.
+    # Return the final charge density and the final electrostatic potential
+    # If Schrödinger solver failed, final_charge_density is None.
     end_time = time.time()
     if verbose:
-        print(f"Total self-consistent loop time: {end_time - start_time:.2f} seconds (Converged).")
+        print(f"Total self-consistent loop time: {end_time - start_time:.2f} seconds.")
 
-    # Return the final converged state
-    return last_successful_results
+    return final_charge_density, final_electrostatic_potential_V
 
 # Note: The 1D self-consistent solver from simulate_1d_dot.py
 # is not included here as it's 1D specific. It could be added
