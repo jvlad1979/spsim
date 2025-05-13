@@ -15,6 +15,7 @@ import matplotlib.patches as patches
 import time
 import os  # Added for creating output directory
 import numpy.fft as fft  # Added for spectral methods
+from hilbertcurve.hilbertcurve import HilbertCurve # Added for Hilbert curve warm start
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -284,6 +285,28 @@ def solve_poisson_2d_spectral(charge_density_2d):
     return phi_2d  # Electrostatic potential in Volts
 
 
+# --- Hilbert Curve Ordering ---
+def get_hilbert_order(nx, ny):
+    """
+    Generates a list of (i, j) indices in Hilbert curve order for an nx x ny grid.
+    """
+    # Determine the Hilbert curve level p such that 2^p >= max(nx, ny)
+    p = int(np.ceil(np.log2(max(nx, ny))))
+    n_dims = 2
+    hilbert_curve = HilbertCurve(p, n_dims)
+
+    # Generate all grid points (indices)
+    points = [(i, j) for i in range(nx) for j in range(ny)]
+
+    # Calculate Hilbert distances for each point
+    distances = hilbert_curve.distances_from_coordinates(points)
+
+    # Sort points based on Hilbert distances
+    hilbert_ordered_indices = [point for _, point in sorted(zip(distances, points))]
+
+    return hilbert_ordered_indices
+
+
 # --- Self-Consistent Iteration (2D) ---
 # (Modified slightly for stability diagram context)
 def self_consistent_solver_2d(
@@ -426,61 +449,56 @@ if __name__ == "__main__":
     total_points = num_v1 * num_v2
     completed_points = 0
 
-    # Variable to store the converged electrostatic potential from the previous point (i, j-1)
-    # This will be updated at the end of each inner loop iteration (j)
-    # Initialize to None for the first point (0, 0)
-    potential_from_previous_point_in_row = None
+    # --- Choose Sweep Strategy ---
+    # Options: 'row_by_row', 'hilbert'
+    sweep_strategy = "hilbert" # Change this to 'row_by_row' for the original behavior
 
-    # --- Loop through sweep voltages ---
-    for i, v1 in enumerate(gate1_voltages):
-        # At the start of a new row (j=0), reset the warm start potential.
-        # This means the first point of each row starts from a zero potential guess.
-        # This line was already present, but the variable needed initialization before the outer loop.
-        # potential_from_previous_point_in_row = None # This line is now redundant and can be removed if present
+    # Initialize warm start potential variable
+    potential_from_previous_point = None
 
-        for j, v2 in enumerate(gate2_voltages):
+    # --- Loop through sweep voltages based on strategy ---
+    if sweep_strategy == "hilbert":
+        print("Using Hilbert curve sweep strategy...")
+        hilbert_indices = get_hilbert_order(num_v1, num_v2)
+        total_points = len(hilbert_indices)
+
+        for point_index, (i, j) in enumerate(hilbert_indices):
+            v1 = gate1_voltages[i]
+            v2 = gate2_voltages[j]
+
             point_start_time = time.time()
             current_voltages = base_voltages.copy()
             current_voltages[gate1_name] = v1
             current_voltages[gate2_name] = v2
 
             print(
-                f"Running point ({i + 1}/{num_v1}, {j + 1}/{num_v2}): {gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
+                f"Running Hilbert point {point_index + 1}/{total_points} (Grid: {i + 1},{j + 1}): "
+                f"{gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
             )
 
-            # Run the self-consistent solver
-            # Run the self-consistent solver
-            # Reduce verbosity inside the loop, reduce max_iter/tol for speed
-            # Pass the warm start potential and the desired Poisson solver type
+            # Run the self-consistent solver with warm start from previous Hilbert point
             final_charge_density, converged_potential_V = self_consistent_solver_2d(
                 current_voltages,
                 fermi_level_J,
-                max_iter=20,  # Reduced iterations
-                tol=5e-4,  # Relaxed tolerance
+                max_iter=20,
+                tol=5e-4,
                 mixing=0.1,
-                verbose=False,  # Only show warnings/errors
-                initial_potential_V=potential_from_previous_point_in_row,  # Pass the initial guess
-                poisson_solver_type="finite_difference",  # Choose the solver here
+                verbose=False,
+                initial_potential_V=potential_from_previous_point, # Use potential from previous Hilbert point
+                poisson_solver_type="finite_difference",
             )
 
             if final_charge_density is not None:
-                # Calculate total number of electrons
                 total_electrons = calculate_total_electrons(final_charge_density)
-                total_electron_map[i, j] = total_electrons
+                total_electron_map[i, j] = total_electrons # Store using original grid indices
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
-
-                # Store the converged potential for the *next* iteration in this row (i, j+1)
-                # Only update if the simulation was successful
-                potential_from_previous_point_in_row = converged_potential_V
-
+                potential_from_previous_point = converged_potential_V # Update for next Hilbert point
             else:
                 print(
                     f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
                 )
-                total_electron_map[i, j] = np.nan  # Mark as failed
-                # If simulation failed, the next point in the row (i, j+1) will use the potential
-                # from the point (i, j-1) (if j > 0) or start from zero (if j=0).
-                # This is handled by not updating `potential_from_previous_point_in_row` on failure.
+                total_electron_map[i, j] = np.nan
+                # Don't update potential_from_previous_point if failed
 
             completed_points += 1
             point_end_time = time.time()
@@ -490,6 +508,58 @@ if __name__ == "__main__":
             print(
                 f"  Point time: {point_end_time - point_start_time:.2f}s. Est. remaining: {estimated_remaining:.1f}s"
             )
+
+    elif sweep_strategy == "row_by_row":
+        print("Using row-by-row sweep strategy...")
+        potential_from_previous_point_in_row = None # Specific to row strategy
+
+        for i, v1 in enumerate(gate1_voltages):
+            potential_from_previous_point_in_row = None # Reset for each new row
+
+            for j, v2 in enumerate(gate2_voltages):
+                point_start_time = time.time()
+                current_voltages = base_voltages.copy()
+                current_voltages[gate1_name] = v1
+                current_voltages[gate2_name] = v2
+
+                print(
+                    f"Running point ({i + 1}/{num_v1}, {j + 1}/{num_v2}): {gate1_name}={v1:.3f}V, {gate2_name}={v2:.3f}V"
+                )
+
+                # Run the self-consistent solver with warm start from previous point in the row
+                final_charge_density, converged_potential_V = self_consistent_solver_2d(
+                    current_voltages,
+                    fermi_level_J,
+                    max_iter=20,
+                    tol=5e-4,
+                    mixing=0.1,
+                    verbose=False,
+                    initial_potential_V=potential_from_previous_point_in_row, # Use potential from previous point in row
+                    poisson_solver_type="finite_difference",
+                )
+
+                if final_charge_density is not None:
+                    total_electrons = calculate_total_electrons(final_charge_density)
+                    total_electron_map[i, j] = total_electrons
+                    print(f"  -> Total Electrons: {total_electrons:.3f}")
+                    potential_from_previous_point_in_row = converged_potential_V # Update for next point in row
+                else:
+                    print(
+                        f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
+                    )
+                    total_electron_map[i, j] = np.nan
+                    # Don't update potential_from_previous_point_in_row if failed
+
+                completed_points += 1
+                point_end_time = time.time()
+                elapsed_time = point_end_time - sweep_start_time
+                time_per_point = elapsed_time / completed_points
+                estimated_remaining = (total_points - completed_points) * time_per_point
+                print(
+                    f"  Point time: {point_end_time - point_start_time:.2f}s. Est. remaining: {estimated_remaining:.1f}s"
+                )
+    else:
+        raise ValueError(f"Unknown sweep_strategy: {sweep_strategy}")
 
     sweep_end_time = time.time()
     print("-" * 50)
