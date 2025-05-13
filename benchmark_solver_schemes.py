@@ -458,11 +458,11 @@ if __name__ == "__main__":
         },  # Typical plunger sweep range
         "P2": {
             "range": (-0.1, 0.0),
-            "perturb_std": 0.02,
+            "perturb_std": 0.01,
         },  # Typical plunger sweep range
-        "B1": {"range": (0.1, 0.2), "perturb_std": 0.02},  # Around fixed 0.15V
-        "B2": {"range": (0.15, 0.25), "perturb_std": 0.02},  # Around fixed 0.20V
-        "B3": {"range": (0.1, 0.2), "perturb_std": 0.02},  # Around fixed 0.15V
+        "B1": {"range": (0.1, 0.2), "perturb_std": 0.01},  # Around fixed 0.15V
+        "B2": {"range": (0.15, 0.25), "perturb_std": 0.01},  # Around fixed 0.20V
+        "B3": {"range": (0.1, 0.2), "perturb_std": 0.01},  # Around fixed 0.15V
     }
 
     def generate_random_voltages():
@@ -509,6 +509,30 @@ if __name__ == "__main__":
         # {"name": "lobpcg_randX", "method": "lobpcg",
         #  "params": {"k": NUM_EIGENSTATES, "use_random_X": True, "tol": 1e-7, "maxiter": (Nx*Ny)//4}},
     ]
+
+    # Add LOBPCG to the list of solver configurations to test
+    if {
+        "name": "lobpcg_randX",
+        "method": "lobpcg",
+        "params": {
+            "k": NUM_EIGENSTATES,
+            "use_random_X": True,
+            "tol": 1e-7,
+            "maxiter": (Nx * Ny) // 4,
+        },
+    } not in schrodinger_solver_configs_to_test:
+        schrodinger_solver_configs_to_test.append(
+            {
+                "name": "lobpcg_randX",
+                "method": "lobpcg",
+                "params": {
+                    "k": NUM_EIGENSTATES,
+                    "use_random_X": True,
+                    "tol": 1e-7,
+                    "maxiter": (Nx * Ny) // 4,
+                },
+            }
+        )
 
     poisson_solver_methods = {
         "Finite Difference": solve_poisson_2d_fd,
@@ -849,6 +873,136 @@ if __name__ == "__main__":
             plt.savefig(plot_filename)
             print(f"Benchmark plot saved to {plot_filename}")
             # plt.show() # Optionally show plot
+
+    # --- Plotting Summary ---
+    def plot_benchmark_summary(summary_stats, n_samples_total):
+        """Plots a summary of the benchmark statistics."""
+        schrodinger_configs = list(summary_stats.keys())
+        if not schrodinger_configs:
+            print("No data to plot.")
+            return
+
+        poisson_methods = list(summary_stats[schrodinger_configs[0]].keys())
+        scenarios = list(
+            summary_stats[schrodinger_configs[0]][poisson_methods[0]].keys()
+        )
+
+        metrics_to_plot = {
+            "total_time": "Avg Total Time (s)",
+            "schrodinger_time_avg": "Avg Schrödinger Time / Iter (s)",
+            "poisson_time_avg": "Avg Poisson Time / Iter (s)",
+            # "iterations": "Avg Iterations" # Removed iterations from plot
+        }
+
+        n_metrics = len(metrics_to_plot)
+        n_scenarios = len(scenarios)
+
+        # Create a single figure with subplots for all scenarios
+        fig, axs = plt.subplots(
+            n_scenarios,
+            n_metrics,
+            figsize=(12 * n_metrics, 5 * n_scenarios),
+            sharex=True,
+            sharey=False,
+        )  # Adjust figsize
+        if n_scenarios == 1 and n_metrics == 1:
+            axs = np.array([[axs]])  # Ensure axs is a 2D array
+        elif n_scenarios == 1:
+            axs = np.array([axs])  # Ensure axs is a 2D array
+        elif n_metrics == 1:
+            axs = axs[:, np.newaxis]  # Ensure axs is a 2D array
+
+        fig.suptitle(
+            "Benchmark Results: All Scenarios", fontsize=16
+        )  # Overall title
+
+        bar_width = 0.8 / len(poisson_methods)  # Adjust bar width
+
+        for scenario_idx, scenario_name in enumerate(scenarios):
+            for metric_idx, (metric_key, metric_label) in enumerate(
+                metrics_to_plot.items()
+            ):
+                ax = axs[scenario_idx, metric_idx]  # Access subplot correctly
+                x_labels = schrodinger_configs
+                x_pos = np.arange(len(x_labels))
+
+                for i, poisson_name in enumerate(poisson_methods):
+                    means = []
+                    stds = []
+                    converged_counts = []
+                    for sch_name in schrodinger_configs:
+                        try:
+                            data = summary_stats[sch_name][poisson_name][scenario_name][
+                                metric_key
+                            ]
+                            means.append(data["mean"])
+                            stds.append(data["std"])
+                            converged_counts.append(
+                                summary_stats[sch_name][poisson_name][scenario_name][
+                                    "iterations"
+                                ]["converged_count"]
+                            )
+                        except (
+                            KeyError,
+                            TypeError,
+                        ):  # Handle missing data or structure issues
+                            means.append(0)  # Plot as zero if data missing
+                            stds.append(0)
+                            converged_counts.append(0)
+
+                    # Calculate positions for grouped bars
+                    positions = (
+                        x_pos
+                        + (i - len(poisson_methods) / 2 + bar_width / 2) * bar_width
+                    )
+                    rects = ax.bar(
+                        positions,
+                        means,
+                        bar_width,
+                        yerr=stds,
+                        label=f"{poisson_name}",
+                        capsize=5,
+                    )
+
+                    # Add text for converged count on top of bars
+                    for rect_idx, rect in enumerate(rects):
+                        height = rect.get_height()
+                        y_val = height + stds[rect_idx]  # Position above error bar
+                        conv_count = converged_counts[rect_idx]
+                        if conv_count > 0 and not np.isnan(
+                            height
+                        ):  # Only show if bar exists and count > 0
+                            ax.text(
+                                rect.get_x() + rect.get_width() / 2.0,
+                                y_val
+                                + 0.01
+                                * np.nanmax(means),  # Adjust offset based on max value
+                                f"{conv_count}/{n_samples_total}",
+                                ha="center",
+                                va="bottom",
+                                fontsize=7,
+                                rotation=90,
+                            )
+
+                ax.set_ylabel(metric_label)
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels(x_labels, rotation=45, ha="right")
+                ax.grid(True, axis="y", linestyle=":", alpha=0.7)
+                if scenario_idx == 0 and metric_idx == 0:  # Add legend once
+                    ax.legend(
+                        title="Poisson Solver", loc="upper left", bbox_to_anchor=(1, 1)
+                    )
+                ax.set_title(
+                    f"Scenario: {scenario_name.replace('_', ' ').title()}"
+                )  # Title each subplot
+
+        plt.tight_layout(
+            rect=[0, 0, 0.95, 0.95]
+        )  # Adjust layout to make space for legend and suptitle
+        plot_filename = "benchmark_summary_all_scenarios.png"
+        plt.savefig(plot_filename)
+        print(f"Combined benchmark plot saved to {plot_filename}")
+        # plt.show()  # Optionally show plot
 
     plot_benchmark_summary(benchmark_summary_stats, N_SAMPLES)
 
