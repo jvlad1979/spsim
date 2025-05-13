@@ -170,7 +170,7 @@ def calculate_charge_density_2d(eigenvalues, eigenvectors_2d, fermi_level):
     """
     Calculates the 2D electron charge density (C/m^2) using Fermi-Dirac statistics.
     """
-    temperature = 1.0  # Temperature in Kelvin (adjust as needed)
+    temperature = 0.1  # Temperature in Kelvin (adjust as needed)
     kT = const.k * temperature  # Thermal energy
 
     density_2d = np.zeros((Nx, Ny))
@@ -358,13 +358,13 @@ if __name__ == "__main__":
 
     # Define Fermi level (relative to minimum external potential)
     initial_ext_pot_J = get_external_potential(X, Y, applied_voltages)
-    fermi_level_J = np.min(initial_ext_pot_J) + 0.05 * e  # Adjusted Fermi level
+    fermi_level_J = np.min(initial_ext_pot_J) + 0.01 * e  # Adjusted Fermi level
 
     # --- Coulomb Diamond Sweep Parameters ---
     gate_1_name = "P1"
     gate_2_name = "P2"
-    gate_1_voltages = np.linspace(-0.3, 0.1, 51)  # Example range
-    gate_2_voltages = np.linspace(-0.3, 0.1, 51)  # Example range
+    gate_1_voltages = np.linspace(-0.4, 0.2, 51)  # Example range
+    gate_2_voltages = np.linspace(-0.4, 0.2, 51)  # Example range
 
     # --- Data Storage ---
     electron_numbers = np.zeros(
