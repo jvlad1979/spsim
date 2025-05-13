@@ -320,8 +320,8 @@ if __name__ == "__main__":
     gate1_name = "P1"
     gate2_name = "P2"
     # Define voltage ranges for the sweep (adjust for desired charge transitions)
-    gate1_voltages = np.linspace(-0.15, 0.0, 121)  # Coarser sweep for speed
-    gate2_voltages = np.linspace(-0.15, 0.0, 121)  # Coarser sweep for speed
+    gate1_voltages = np.linspace(-0.1, 0.0, 121)  # Coarser sweep for speed
+    gate2_voltages = np.linspace(-0.1, 0.0, 121)  # Coarser sweep for speed
     num_v1 = len(gate1_voltages)
     num_v2 = len(gate2_voltages)
 
