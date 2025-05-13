@@ -3,27 +3,27 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "quantum_dot_sim"
+name = "spsim"
 version = "0.1.0"
 description = "A package for simulating quantum dot devices."
 authors = [
-    { name = "AI Software Developer" }
+    { name = "Daniel Schug" }
 ]
 dependencies = [
     "numpy",
     "scipy",
     "matplotlib",
-    "scikit-sparse",
     "hilbertcurve"
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
 
-[project.scripts]
-quantum_dot_sim = "quantum_dot_sim.cli:main"
+# [project.scripts]
+# quantum_dot_sim = "spsim.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["quantum_dot_sim"]
-include = ["*"]
-namespaces = false
+where = ["src"]
+include = ["spsim*"]  # ["*"] by default
+exclude = []  # empty by default
+namespaces = false  # true by default
