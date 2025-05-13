@@ -379,17 +379,18 @@ if __name__ == "__main__":
     print("Starting Schrödinger-Poisson Solver Benchmark Script")
     print(f"Grid: Nx={Nx}, Ny={Ny}\n")
 
-    N_SAMPLES = 32 # Number of random voltage samples
+    N_SAMPLES = 100 # Number of random voltage samples
     NUM_EIGENSTATES = 10 # Default number of eigenstates to solve for
 
-    # Define voltage ranges for random generation
+    # Define voltage ranges for random generation, aligned with charge stability simulations
     # Gate names: "P1", "P2", "B1", "B2", "B3"
+    # P1, P2 swept in (-0.1, 0.0) in stability. B1=0.15, B2=0.20, B3=0.15.
     voltage_config = {
-        "P1": {"range": (-0.3, 0.0), "perturb_std": 0.02},
-        "P2": {"range": (-0.3, 0.0), "perturb_std": 0.02},
-        "B1": {"range": (0.0, 0.3), "perturb_std": 0.02},
-        "B2": {"range": (0.0, 0.3), "perturb_std": 0.02},
-        "B3": {"range": (0.0, 0.3), "perturb_std": 0.02},
+        "P1": {"range": (-0.1, 0.0), "perturb_std": 0.02}, # Typical plunger sweep range
+        "P2": {"range": (-0.1, 0.0), "perturb_std": 0.02}, # Typical plunger sweep range
+        "B1": {"range": (0.1, 0.2), "perturb_std": 0.02},  # Around fixed 0.15V
+        "B2": {"range": (0.15, 0.25), "perturb_std": 0.02},# Around fixed 0.20V
+        "B3": {"range": (0.1, 0.2), "perturb_std": 0.02},  # Around fixed 0.15V
     }
 
     def generate_random_voltages():
