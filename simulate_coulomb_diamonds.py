@@ -272,7 +272,7 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
     initial_mixing = mixing
     min_mixing = 0.01
     mixing_decay_rate = 0.9  # Reduce mixing by this factor if not converging
-    previous_potential_diff_norm = float('inf')  # Initialize to a large value
+    previous_potential_diff_norm = float("inf")  # Initialize to a large value
 
     for i in range(max_iter):
         iter_start_time = time.time()
@@ -358,9 +358,7 @@ if __name__ == "__main__":
 
     # Define Fermi level (relative to minimum external potential)
     initial_ext_pot_J = get_external_potential(X, Y, applied_voltages)
-    fermi_level_J = (
-        np.min(initial_ext_pot_J) + 0.05 * e
-    )  # Adjusted Fermi level
+    fermi_level_J = np.min(initial_ext_pot_J) + 0.05 * e  # Adjusted Fermi level
 
     # --- Coulomb Diamond Sweep Parameters ---
     gate_1_name = "P1"
@@ -432,4 +430,3 @@ if __name__ == "__main__":
     plot_filename = "coulomb_diamonds.png"
     plt.savefig(plot_filename)
     print(f"Coulomb diamond plot saved to {plot_filename}")
-```
