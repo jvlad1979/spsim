@@ -423,8 +423,18 @@ if __name__ == "__main__":
     total_points = num_v1 * num_v2
     completed_points = 0
 
+    # Variable to store the converged electrostatic potential from the previous point (i, j-1)
+    # This will be updated at the end of each inner loop iteration (j)
+    # Initialize to None for the first point (0, 0)
+    potential_from_previous_point_in_row = None
+
     # --- Loop through sweep voltages ---
     for i, v1 in enumerate(gate1_voltages):
+        # At the start of a new row (j=0), reset the warm start potential.
+        # This means the first point of each row starts from a zero potential guess.
+        # This line was already present, but the variable needed initialization before the outer loop.
+        # potential_from_previous_point_in_row = None # This line is now redundant and can be removed if present
+
         for j, v2 in enumerate(gate2_voltages):
             point_start_time = time.time()
             current_voltages = base_voltages.copy()
