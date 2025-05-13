@@ -431,30 +431,36 @@ if __name__ == "__main__":
     plot_filename = os.path.join(output_dir, f"charge_stability_{gate1_name}_{gate2_name}.png")
     plt.savefig(plot_filename)
     print(f"Charge stability plot saved to {plot_filename}")
+    plt.show() # Force plot to display
 
     # Optional: Plot rounded electron numbers to emphasize plateaus
-    plt.figure(figsize=(8, 7))
-    rounded_electrons = np.round(plot_data)
-    rounded_electrons_masked = np.ma.masked_invalid(rounded_electrons)
-    # Use discrete colormap or levels for integer steps
-    n_levels = int(np.nanmax(rounded_electrons) - np.nanmin(rounded_electrons)) + 1
-    levels = np.arange(np.floor(np.nanmin(rounded_electrons)), np.ceil(np.nanmax(rounded_electrons)) + 1) - 0.5
-    cmap_discrete = plt.cm.get_cmap('viridis', n_levels if n_levels > 0 else 1)
-    cmap_discrete.set_bad(color='grey')
+    try:
+        plt.figure(figsize=(8, 7))
+        rounded_electrons = np.round(plot_data)
+        rounded_electrons_masked = np.ma.masked_invalid(rounded_electrons)
+        # Use discrete colormap or levels for integer steps
+        n_levels = int(np.nanmax(rounded_electrons) - np.nanmin(rounded_electrons)) + 1
+        levels = np.arange(np.floor(np.nanmin(rounded_electrons)), np.ceil(np.nanmax(rounded_electrons)) + 1) - 0.5
+        cmap_discrete = plt.cm.get_cmap('viridis', n_levels if n_levels > 0 else 1)
+        cmap_discrete.set_bad(color='grey')
 
-    pcm_rounded = plt.pcolormesh(V1, V2, rounded_electrons_masked, cmap=cmap_discrete, shading='auto', vmin=levels.min(), vmax=levels.max())
-    cbar = plt.colorbar(pcm_rounded, label='Rounded Total Electrons', ticks=np.round(levels[:-1]+0.5)) # Ticks at integers
-    # cbar.set_ticks(np.arange(int(np.nanmin(rounded_electrons)), int(np.nanmax(rounded_electrons)) + 1))
+        pcm_rounded = plt.pcolormesh(V1, V2, rounded_electrons_masked, cmap=cmap_discrete, shading='auto', vmin=levels.min(), vmax=levels.max())
+        cbar = plt.colorbar(pcm_rounded, label='Rounded Total Electrons', ticks=np.round(levels[:-1]+0.5)) # Ticks at integers
+        # cbar.set_ticks(np.arange(int(np.nanmin(rounded_electrons)), int(np.nanmax(rounded_electrons)) + 1))
 
 
-    plt.xlabel(f"Gate Voltage {gate1_name} (V)")
-    plt.ylabel(f"Gate Voltage {gate2_name} (V)")
-    plt.title(f"Charge Stability Diagram (Rounded Total Electrons)\nFixed: {base_voltages}")
-    plt.grid(True, linestyle=':', alpha=0.5)
-    plt.axis('tight')
+        plt.xlabel(f"Gate Voltage {gate1_name} (V)")
+        plt.ylabel(f"Gate Voltage {gate2_name} (V)")
+        plt.title(f"Charge Stability Diagram (Rounded Total Electrons)\nFixed: {base_voltages}")
+        plt.grid(True, linestyle=':', alpha=0.5)
+        plt.axis('tight')
 
-    plot_filename_rounded = os.path.join(output_dir, f"charge_stability_rounded_{gate1_name}_{gate2_name}.png")
-    plt.savefig(plot_filename_rounded)
-    print(f"Rounded charge stability plot saved to {plot_filename_rounded}")
+        plot_filename_rounded = os.path.join(output_dir, f"charge_stability_rounded_{gate1_name}_{gate2_name}.png")
+        plt.savefig(plot_filename_rounded)
+        plt.show() # Force plot to display
+        print(f"Rounded charge stability plot saved to {plot_filename_rounded}")
+
+    except Exception as e:
+        print(f"Error during rounded plot generation: {e}")
 
     print("Done.")
