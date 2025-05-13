@@ -175,6 +175,7 @@ if __name__ == "__main__":
             # Could add check for (i, j-1) as well, but prioritizing one is simpler for now.
 
             # Run the self-consistent solver using spsim.simulation_runtime.sc_solver
+            # It now returns (final_charge_density, final_electrostatic_potential_V)
             sc_results = self_consistent_solver_2d(
                 voltages=current_voltages,
                 fermi_level=fermi_level_J,
@@ -188,21 +189,18 @@ if __name__ == "__main__":
                 schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
             )
 
-            # sc_results is (total_potential_J, charge_density, eigenvalues, eigenvectors_2d)
-            # or (None, None, None, None) on failure
-            if sc_results[0] is not None: # Check if total_potential_J is not None
-                total_potential_J, final_charge_density, _eigenvalues, _eigenvectors = sc_results
-                
+            # sc_results is now (final_charge_density, final_electrostatic_potential_V)
+            # or (None, None) on failure
+            final_charge_density, converged_potential_V = sc_results # Unpack the results
+
+            if final_charge_density is not None: # Check if charge density is not None
                 # Call to spsim's calculate_total_electrons requires dx, dy
                 total_electrons = calculate_total_electrons(final_charge_density, dx, dy)
                 total_electron_map[i, j] = total_electrons # Store using original grid indices
 
-                # For warm start: calculate electrostatic potential from total and external
-                current_external_potential_J = get_external_potential(X, Y, current_voltages, Lx, Ly)
-                converged_electrostatic_potential_V = (current_external_potential_J - total_potential_J) / e
-                
-                converged_potentials_map[i][j] = converged_electrostatic_potential_V
-                potential_from_previous_point = converged_electrostatic_potential_V # Update for next Hilbert point
+                # Use the returned converged potential directly for the next warm start
+                converged_potentials_map[i][j] = converged_potential_V
+                potential_from_previous_point = converged_potential_V # Update for next Hilbert point
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
             else:
                 print(
