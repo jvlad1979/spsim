@@ -326,9 +326,9 @@ if __name__ == "__main__":
     ref_voltages[gate1_name] = gate1_voltages.mean() # Use mid-range voltage
     ref_voltages[gate2_name] = gate2_voltages.mean()
     initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
-    # Set Fermi level slightly below the potential minimum to start with zero electrons
-    # Or adjust based on expected filling. Let's set it low initially.
-    fermi_level_J = np.min(initial_ext_pot_J) - 0.01 * e # Example: 10 meV below min potential
+    # Set Fermi level slightly above the potential minimum of the reference configuration
+    # to ensure some states are occupied within the sweep range.
+    fermi_level_J = np.min(initial_ext_pot_J) + 0.05 * e # Example: 50 meV above min potential
 
     print("\n--- Starting Charge Stability Diagram Simulation ---")
     print(f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)")
@@ -441,7 +441,8 @@ if __name__ == "__main__":
         # Use discrete colormap or levels for integer steps
         n_levels = int(np.nanmax(rounded_electrons) - np.nanmin(rounded_electrons)) + 1
         levels = np.arange(np.floor(np.nanmin(rounded_electrons)), np.ceil(np.nanmax(rounded_electrons)) + 1) - 0.5
-        cmap_discrete = plt.cm.get_cmap('viridis', n_levels if n_levels > 0 else 1)
+        # Use plt.colormaps.get_cmap instead of plt.cm.get_cmap
+        cmap_discrete = plt.colormaps.get_cmap('viridis', n_levels if n_levels > 0 else 1)
         cmap_discrete.set_bad(color='grey')
 
         pcm_rounded = plt.pcolormesh(V1, V2, rounded_electrons_masked, cmap=cmap_discrete, shading='auto', vmin=levels.min(), vmax=levels.max())
