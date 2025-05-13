@@ -127,14 +127,15 @@ def get_external_potential(X, Y, voltages):
 
 
 # --- Schrödinger Solver (2D) ---
-# (Identical to simulate_2d_dot.py - no changes needed here)
-def solve_schrodinger_2d(potential_2d):
+def solve_schrodinger_2d(potential_2d, solver_config):
     """
-        Solves the 2D time-independent Schrödinger equation.
-        Returns eigenvalues (energies) and eigenvectors (wavefunctions reshaped to
-    2D).
+    Solves the 2D time-independent Schrödinger equation using a specified solver configuration.
+    (Adapted from benchmark_solver_schemes.py)
+    solver_config (dict): Configuration for the solver.
+        Example: {'method': 'eigsh', 'params': {'k': 10, 'which': 'SM'}}
+                 {'method': 'eigsh', 'params': {'k': 10, 'which': 'LM', 'use_sigma_min_potential': True, 'tol': 1e-8}}
     """
-    potential_flat = potential_2d.flatten(order="C")  # Flatten consistently
+    potential_flat = potential_2d.flatten(order="C")
 
     # Construct the 2D Hamiltonian using sparse matrix format
     diag = hbar**2 / (m_eff * dx**2) + hbar**2 / (m_eff * dy**2) + potential_flat
@@ -144,26 +145,52 @@ def solve_schrodinger_2d(potential_2d):
     diagonals = [diag, offdiag_x[:-1], offdiag_x[:-1], offdiag_y[:-Nx], offdiag_y[:-Nx]]
     offsets = [0, -1, 1, -Nx, Nx]
 
-    for i in range(1, Nx):
+    for i in range(1, Nx): # Boundary condition adjustments for finite difference
         diagonals[1][i * Ny - 1] = 0.0
     for i in range(Nx - 1):
         diagonals[2][(i + 1) * Ny - 1] = 0.0
 
     H = sp.diags(diagonals, offsets, shape=(N_total, N_total), format="csc")
 
+    method = solver_config.get('method', 'eigsh')
+    params = solver_config.get('params', {})
+    num_eigenstates = params.get('k', 10) # Default to 10 eigenstates if not specified
+
+    eigenvalues = np.array([])
+    eigenvectors_flat = np.empty((N_total, 0))
+
     try:
-        num_eigenstates = 10  # Adjust as needed
-        eigenvalues, eigenvectors_flat = spla.eigsh(H, k=num_eigenstates, which="SM")
-    except Exception as e:
-        print(f"Eigenvalue solver failed: {e}")
+        if method == 'eigsh':
+            eigsh_params = params.copy()
+            if eigsh_params.pop('use_sigma_min_potential', False):
+                sigma = np.min(potential_flat)
+                eigsh_params['sigma'] = sigma
+                if 'which' not in eigsh_params: # sigma requires which='LM' or 'LA' typically
+                    eigsh_params['which'] = 'LM'
+            
+            # Remove non-eigsh specific params if any were added for other types (e.g. from benchmark script)
+            eigsh_params.pop('use_random_X', None) 
+
+            eigenvalues, eigenvectors_flat = spla.eigsh(H, **eigsh_params)
+        # Add other methods like LOBPCG here if needed in the future
+        else:
+            raise ValueError(f"Unsupported Schrödinger solver method: {method}")
+
+    except Exception as exc:
+        print(f"Eigenvalue solver {method} failed: {exc}")
         return np.array([]), np.empty((Nx, Ny, 0))
 
     eigenvectors = np.zeros((Nx, Ny, num_eigenstates))
-    for i in range(num_eigenstates):
+    # Ensure we don't try to access more eigenvectors than computed
+    actual_computed_states = eigenvectors_flat.shape[1]
+    for i in range(min(num_eigenstates, actual_computed_states)):
         psi_flat = eigenvectors_flat[:, i]
-        norm = np.sqrt(np.sum(np.abs(psi_flat) ** 2) * dx * dy)
-        eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
-
+        norm_sq = np.sum(np.abs(psi_flat) ** 2) * dx * dy
+        if norm_sq > 1e-12: # Avoid division by zero for zero vectors
+            norm = np.sqrt(norm_sq)
+            eigenvectors[:, :, i] = (psi_flat / norm).reshape((Nx, Ny), order="C")
+        else:
+            eigenvectors[:, :, i] = psi_flat.reshape((Nx, Ny), order="C") # Keep as is if norm is zero
     return eigenvalues, eigenvectors
 
 
@@ -318,10 +345,12 @@ def self_consistent_solver_2d(
     verbose=False,
     initial_potential_V=None,  # Keep warm start parameter
     poisson_solver_type="finite_difference",  # Add solver type option
+    schrodinger_solver_config=None, # Added Schrödinger solver config
 ):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
     Allows choosing the Poisson solver ('finite_difference' or 'spectral').
+    `schrodinger_solver_config` is passed to `solve_schrodinger_2d`.
     Returns the final charge density and the converged electrostatic potential.
     """
     if verbose:
@@ -335,12 +364,17 @@ def self_consistent_solver_2d(
     # Initialize converged_potential_V with the initial guess or zero potential
     converged_potential_V = electrostatic_potential_V.copy()
 
+    # Default Schrödinger solver config if none provided
+    if schrodinger_solver_config is None:
+        schrodinger_solver_config = {"method": "eigsh", "params": {"k": 10, "which": "SM"}}
+
+
     for i in range(max_iter):
         total_potential_J = external_potential_J - e * electrostatic_potential_V
-        eigenvalues, eigenvectors_2d = solve_schrodinger_2d(total_potential_J)
+        eigenvalues, eigenvectors_2d = solve_schrodinger_2d(total_potential_J, schrodinger_solver_config)
 
-        if not eigenvalues.size:
-            print("Error in Schrödinger solver. Aborting SC loop.")
+        if not eigenvalues.size or eigenvectors_2d.shape[2] == 0: # Check if any eigenvectors were returned
+            print("Error in Schrödinger solver during SC iteration. Aborting.")
             return None, None  # Indicate failure by returning None for both values
 
         new_charge_density = calculate_charge_density_2d(
@@ -421,7 +455,26 @@ if __name__ == "__main__":
     # Define Fermi level (relative to minimum external potential of a reference state)
     # Calculate based on a typical operating point, keep constant during sweep.
     ref_voltages = base_voltages.copy()
-    ref_voltages[gate1_name] = gate1_voltages.mean()  # Use mid-range voltage
+    ref_voltages[gate1_name] = np.mean(gate1_voltages)  # Use mid-range voltage
+    ref_voltages[gate2_name] = np.mean(gate2_voltages)
+    initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
+    # Set Fermi level slightly above the potential minimum of the reference configuration
+    # to ensure some states are occupied within the sweep range.
+    fermi_level_J = (
+        np.min(initial_ext_pot_J) + 0.05 * e
+    )  # Example: 50 meV above min potential
+
+    # --- Define Schrödinger Solver Configuration ---
+    # Using the 'eigsh_LM_sigma_min_pot' configuration
+    NUM_EIGENSTATES_STABILITY = 10 # Can be adjusted
+    schrodinger_solver_config_stability = {
+        "name": "eigsh_LM_sigma_min_pot", # Name for reference, not used by solver directly
+        "method": "eigsh",
+        "params": {"k": NUM_EIGENSTATES_STABILITY, "which": "LM", "use_sigma_min_potential": True, "tol":1e-8}
+    }
+
+    print("\n--- Starting Charge Stability Diagram Simulation ---")
+    print(
     ref_voltages[gate2_name] = gate2_voltages.mean()
     initial_ext_pot_J = get_external_potential(X, Y, ref_voltages)
     # Set Fermi level slightly above the potential minimum of the reference configuration
@@ -500,6 +553,7 @@ if __name__ == "__main__":
                 verbose=False,
                 initial_potential_V=warm_start_potential, # Use the determined warm start
                 poisson_solver_type="finite_difference",
+                schrodinger_solver_config=schrodinger_solver_config_stability,
             )
 
             if final_charge_density is not None:
@@ -552,6 +606,7 @@ if __name__ == "__main__":
                     verbose=False,
                     initial_potential_V=potential_from_previous_point_in_row, # Use potential from previous point in row
                     poisson_solver_type="finite_difference",
+                    schrodinger_solver_config=schrodinger_solver_config_stability,
                 )
 
                 if final_charge_density is not None:
