@@ -446,7 +446,7 @@ if __name__ == "__main__":
                 tol=5e-4,  # Relaxed tolerance
                 mixing=0.1,
                 verbose=False,  # Only show warnings/errors
-                initial_potential_V=initial_guess_V, # Pass the initial guess
+                initial_potential_V=potential_from_previous_point_in_row, # Pass the initial guess
                 poisson_solver_type="finite_difference", # Choose the solver here
             )
 
