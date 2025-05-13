@@ -179,10 +179,10 @@ if __name__ == "__main__":
                 voltages=current_voltages,
                 fermi_level=fermi_level_J,
                 Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
-                max_iter=20,  # From original script's call
-                tol=5e-4,    # From original script's call
+                max_iter=30,  # From original script's call
+                tol=1e-4,    # From original script's call
                 mixing=0.1,  # From original script's call
-                verbose=True, # From original script's call
+                verbose=False, # From original script's call
                 initial_potential_V=warm_start_potential,
                 poisson_solver_type="finite_difference", # From original script's call
                 schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
@@ -243,10 +243,10 @@ if __name__ == "__main__":
                     voltages=current_voltages,
                     fermi_level=fermi_level_J,
                     Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
-                    max_iter=20,  # From original script's call
-                    tol=5e-4,    # From original script's call
+                    max_iter=30,  # From original script's call
+                    tol=1e-4,    # From original script's call
                     mixing=0.1,  # From original script's call
-                    verbose=True, # From original script's call
+                    verbose=False, # From original script's call
                     initial_potential_V=potential_from_previous_point_in_row,
                     poisson_solver_type="finite_difference", # From original script's call
                     schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
