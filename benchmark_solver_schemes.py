@@ -14,6 +14,7 @@ import scipy.sparse.linalg as spla
 import time
 import numpy.fft as fft
 import random
+import matplotlib.pyplot as plt
 # import cProfile # For more detailed profiling
 
 # --- Physical Constants ---
@@ -546,5 +547,83 @@ if __name__ == "__main__":
     print("   Example: python -m cProfile -s cumtime benchmark_solver_schemes.py")
     print("5. To implement FEM: replace 'solve_poisson_2d_fem_stub' with a working FEM solver.")
     print("6. Schrödinger solver 'tol' and 'maxiter' can be tuned within 'schrodinger_solver_configs_to_test'.")
+
+    # --- Plotting Summary ---
+    def plot_benchmark_summary(summary_stats, n_samples_total):
+        """Plots a summary of the benchmark statistics."""
+        schrodinger_configs = list(summary_stats.keys())
+        if not schrodinger_configs:
+            print("No data to plot.")
+            return
+
+        poisson_methods = list(summary_stats[schrodinger_configs[0]].keys())
+        scenarios = list(summary_stats[schrodinger_configs[0]][poisson_methods[0]].keys())
+        
+        metrics_to_plot = {
+            "total_time": "Avg Total Time (s)",
+            "schrodinger_time_avg": "Avg Schrödinger Time / Iter (s)",
+            "poisson_time_avg": "Avg Poisson Time / Iter (s)",
+            "iterations": "Avg Iterations"
+        }
+
+        n_metrics = len(metrics_to_plot)
+        n_scenarios = len(scenarios)
+        
+        # One figure per scenario for clarity
+        for scenario_idx, scenario_name in enumerate(scenarios):
+            fig, axs = plt.subplots(n_metrics, 1, figsize=(12, 5 * n_metrics), sharex=True)
+            if n_metrics == 1: # Make axs iterable if only one metric
+                axs = [axs]
+            fig.suptitle(f"Benchmark Results: {scenario_name.replace('_', ' ').title()}", fontsize=16)
+
+            bar_width = 0.35
+            
+            for metric_idx, (metric_key, metric_label) in enumerate(metrics_to_plot.items()):
+                ax = axs[metric_idx]
+                
+                x_labels = schrodinger_configs
+                x_pos = np.arange(len(x_labels))
+                
+                for i, poisson_name in enumerate(poisson_methods):
+                    means = []
+                    stds = []
+                    converged_counts = []
+                    for sch_name in schrodinger_configs:
+                        try:
+                            data = summary_stats[sch_name][poisson_name][scenario_name][metric_key]
+                            means.append(data['mean'])
+                            stds.append(data['std'])
+                            converged_counts.append(summary_stats[sch_name][poisson_name][scenario_name]["iterations"]['converged_count'])
+                        except (KeyError, TypeError): # Handle missing data or structure issues
+                            means.append(0) # Plot as zero if data missing
+                            stds.append(0)
+                            converged_counts.append(0)
+                    
+                    rects = ax.bar(x_pos + i * bar_width - bar_width/2 * (len(poisson_methods)-1) , means, bar_width, yerr=stds, label=f"{poisson_name}", capsize=5)
+
+                    # Add text for converged count on top of bars
+                    for rect_idx, rect in enumerate(rects):
+                        height = rect.get_height()
+                        y_val = height + stds[rect_idx] # Position above error bar
+                        conv_count = converged_counts[rect_idx]
+                        if conv_count > 0 and not np.isnan(height): # Only show if bar exists and count > 0
+                             ax.text(rect.get_x() + rect.get_width() / 2., y_val + 0.01 * np.nanmax(means), # Adjust offset based on max value
+                                     f'{conv_count}/{n_samples_total}', ha='center', va='bottom', fontsize=8, rotation=0)
+
+
+                ax.set_ylabel(metric_label)
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels(x_labels, rotation=15, ha="right")
+                ax.grid(True, axis='y', linestyle=':', alpha=0.7)
+                if metric_idx == 0: # Add legend to the first subplot
+                    ax.legend(title="Poisson Solver", loc="upper left", bbox_to_anchor=(1,1))
+
+            plt.tight_layout(rect=[0, 0, 0.85, 0.96]) # Adjust layout to make space for legend and suptitle
+            plot_filename = f"benchmark_summary_{scenario_name}.png"
+            plt.savefig(plot_filename)
+            print(f"Benchmark plot saved to {plot_filename}")
+            # plt.show() # Optionally show plot
+
+    plot_benchmark_summary(benchmark_summary_stats, N_SAMPLES)
 
     print("\nBenchmark script finished.")
