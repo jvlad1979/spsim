@@ -301,9 +301,10 @@ def solve_poisson_2d_spectral(charge_density_2d):
 
 
 # --- Self-Consistent Iteration (2D) ---
-def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixing=0.1):
+def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixing=0.1, poisson_solver_type="finite_difference"):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
+    Allows choosing the Poisson solver ('finite_difference' or 'spectral').
     """
     print("Starting 2D self-consistent calculation...")
     start_time = time.time()
@@ -337,7 +338,15 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
         )
 
         # 4. Solve Poisson equation
-        new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
+        # 4. Solve Poisson equation using the selected solver
+        if poisson_solver_type == "finite_difference":
+            new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
+        elif poisson_solver_type == "spectral":
+             # Note: Spectral solver assumes periodic boundary conditions,
+            # which may differ from the desired physics (Dirichlet).
+            new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
+        else:
+            raise ValueError(f"Unknown poisson_solver_type: {poisson_solver_type}")
 
         # 5. Check for convergence (using norm of potential difference)
         potential_diff_norm = np.linalg.norm(
@@ -443,6 +452,7 @@ if __name__ == "__main__":
         applied_voltages[gate_to_sweep] = v_sweep
 
         # Run the self-consistent solver
+        # Add poisson_solver_type='finite_difference' or 'spectral' here
         total_potential, charge_density, eigenvalues, eigenvectors = (
             self_consistent_solver_2d(
                 applied_voltages,
@@ -450,6 +460,7 @@ if __name__ == "__main__":
                 max_iter=30,
                 tol=1e-4,
                 mixing=0.05,  # Use same parameters as before, adjust if needed
+                poisson_solver_type="finite_difference", # Choose the solver here
             )
         )
 

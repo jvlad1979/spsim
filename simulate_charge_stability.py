@@ -286,11 +286,19 @@ def solve_poisson_2d_spectral(charge_density_2d):
 # --- Self-Consistent Iteration (2D) ---
 # (Modified slightly for stability diagram context)
 def self_consistent_solver_2d(
-    voltages, fermi_level, max_iter=30, tol=1e-4, mixing=0.1, verbose=False, initial_potential_V=None # Keep warm start parameter
+    voltages,
+    fermi_level,
+    max_iter=30,
+    tol=1e-4,
+    mixing=0.1,
+    verbose=False,
+    initial_potential_V=None, # Keep warm start parameter
+    poisson_solver_type="finite_difference", # Add solver type option
 ):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
-    Returns the final charge density and the converged electrostatic potential. # Updated return value
+    Allows choosing the Poisson solver ('finite_difference' or 'spectral').
+    Returns the final charge density and the converged electrostatic potential.
     """
     if verbose:
         print(f"Running SC calculation for voltages: {voltages}")
@@ -316,11 +324,17 @@ def self_consistent_solver_2d(
         )
         final_charge_density = new_charge_density  # Store the latest density
 
-        # Use the finite difference Poisson solver for now
-        new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
-        # If you wanted to use the spectral solver, you would uncomment the line below
-        # new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
+        # 4. Solve Poisson equation using the selected solver
+        if poisson_solver_type == "finite_difference":
+            new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
+        elif poisson_solver_type == "spectral":
+            # Note: Spectral solver assumes periodic boundary conditions,
+            # which may differ from the desired physics (Dirichlet).
+            new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
+        else:
+            raise ValueError(f"Unknown poisson_solver_type: {poisson_solver_type}")
 
+        # 5. Check for convergence (using norm of potential difference)
         potential_diff_norm = np.linalg.norm(
             new_electrostatic_potential_V - electrostatic_potential_V
         ) * np.sqrt(dx * dy)
@@ -422,14 +436,18 @@ if __name__ == "__main__":
             )
 
             # Run the self-consistent solver
+            # Run the self-consistent solver
             # Reduce verbosity inside the loop, reduce max_iter/tol for speed
-            final_charge_density = self_consistent_solver_2d(
+            # Pass the warm start potential and the desired Poisson solver type
+            final_charge_density, converged_potential_V = self_consistent_solver_2d(
                 current_voltages,
                 fermi_level_J,
                 max_iter=20,  # Reduced iterations
                 tol=5e-4,  # Relaxed tolerance
                 mixing=0.1,
                 verbose=False,  # Only show warnings/errors
+                initial_potential_V=initial_guess_V, # Pass the initial guess
+                poisson_solver_type="finite_difference", # Choose the solver here
             )
 
             if final_charge_density is not None:
@@ -437,11 +455,19 @@ if __name__ == "__main__":
                 total_electrons = calculate_total_electrons(final_charge_density)
                 total_electron_map[i, j] = total_electrons
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
+
+                # Store the converged potential for the *next* iteration in this row (i, j+1)
+                # Only update if the simulation was successful
+                potential_from_previous_point_in_row = converged_potential_V
+
             else:
                 print(
                     f"  -> Simulation failed for point ({i + 1},{j + 1}). Storing NaN."
                 )
                 total_electron_map[i, j] = np.nan  # Mark as failed
+                # If simulation failed, the next point in the row (i, j+1) will use the potential
+                # from the point (i, j-1) (if j > 0) or start from zero (if j=0).
+                # This is handled by not updating `potential_from_previous_point_in_row` on failure.
 
             completed_points += 1
             point_end_time = time.time()
