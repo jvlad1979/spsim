@@ -3,3 +3,4 @@ scipy
 matplotlib
 scikit-sparse
 hilbertcurve
+scikit-sparse==0.4.4
