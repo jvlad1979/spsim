@@ -329,6 +329,78 @@ The discretized Poisson equation becomes a linear system $A\phi = b$. Sparse lin
 \subsection{Spectral Method (Poisson)}
 The \texttt{solve\_poisson\_2d\_spectral} function uses Fast Fourier Transforms (FFTs) to solve the Poisson equation in k-space. The equation $\nabla^2 \phi = -\rho/\epsilon$ becomes $-K^2 \Phi_k = -P_k/\epsilon$ in Fourier space, where $K^2 = k_x^2 + k_y^2$, and $\Phi_k, P_k$ are the Fourier transforms of $\phi, \rho$. This method is efficient for uniform grids and periodic boundary conditions. The DC component ($K=0$) is handled separately by setting $\Phi_k(0,0)=0$, which corresponds to setting the average potential to zero.
 
+\section{Benchmark Results and Numerical Schemes}
+
+\subsection{Benchmark Summary}
+
+The performance of different numerical schemes for solving the Schrödinger-Poisson equations was benchmarked using the \texttt{benchmark\_solver\_schemes.py} script. The script tests different Poisson solvers (Finite Difference, Spectral) and Schrödinger solvers (various configurations of \texttt{eigsh} and \texttt{lobpcg}) under different scenarios, including cold starts with random voltages and warm starts with perturbed voltages.
+
+Figure \ref{fig:benchmark_summary} shows a summary of the benchmark results across all scenarios. The plot illustrates the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration for each combination of solvers and scenarios. The number of converged samples out of the total number of samples is also indicated on the plot.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{benchmark_summary_all_scenarios.png}
+    \caption{Benchmark results for different Schrödinger-Poisson solver schemes across various scenarios. The plot shows the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration. The number of converged samples is also indicated.}
+    \label{fig:benchmark_summary}
+\end{figure}
+
+\subsection{Numerical Schemes: Background and Implementation Details}
+
+The simulation suite employs several numerical schemes to solve the Schrödinger and Poisson equations. This section provides a brief overview of these schemes, including their background and implementation details.
+
+\subsubsection{Schrödinger Solvers}
+
+\paragraph{Finite Difference Method}
+The Schrödinger equation is discretized using the finite difference method (FDM). The second derivative is approximated using a central difference scheme:
+
+\[
+\frac{d^2\psi}{dx^2} \approx \frac{\psi_{i+1} - 2\psi_i + \psi_{i-1}}{dx^2}
+\]
+
+In 2D, the Laplacian is approximated using a 5-point stencil. This discretization transforms the Schrödinger equation into a sparse matrix eigenvalue problem.
+
+\paragraph{\texttt{eigsh} (ARPACK)}
+The \texttt{eigsh} function from \texttt{scipy.sparse.linalg} is used to solve the sparse matrix eigenvalue problem arising from the discretized Schrödinger equation. \texttt{eigsh} is a wrapper around the ARPACK library, which implements the Implicitly Restarted Arnoldi Method (IRAM).
+
+ARPACK is designed for finding a few eigenvalues and eigenvectors of large sparse matrices. It is particularly efficient for finding eigenvalues at the extreme ends of the spectrum (i.e., smallest or largest magnitude).
+
+Key parameters for \texttt{eigsh} include:
+\begin{itemize}
+    \item \texttt{k}: The number of eigenvalues and eigenvectors to find.
+    \item \texttt{which}: Specifies which eigenvalues to find (e.g., \texttt{'SM'} for smallest magnitude, \texttt{'LM'} for largest magnitude).
+    \item \texttt{sigma}: Specifies a shift value for finding eigenvalues near a particular value. Using \texttt{sigma} can improve convergence for interior eigenvalues.
+    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+    \item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
+
+\paragraph{\texttt{lobpcg}}
+The \texttt{lobpcg} function from \texttt{scipy.sparse.linalg} implements the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) method. LOBPCG is an iterative method for finding the lowest (or highest) eigenvalues and corresponding eigenvectors of a symmetric (or Hermitian) matrix.
+
+LOBPCG is a block Krylov subspace method, which means it operates on a block of vectors simultaneously. This can lead to faster convergence compared to single-vector methods like the power method or the Lanczos method.
+
+Key parameters for \texttt{lobpcg} include:
+\begin{itemize}
+    \item \texttt{X}: An initial guess for the eigenvectors. The shape of \texttt{X} determines the number of eigenvalues and eigenvectors to find.
+    \item \texttt{B}: A preconditioner matrix. A good preconditioner can significantly improve convergence.
+    \item \texttt{M}: A constraint matrix.
+    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+    \item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
+
+\subsubsection{Poisson Solvers}
+
+\paragraph{Finite Difference Method}
+The Poisson equation is also discretized using the finite difference method. The Laplacian is approximated using a central difference scheme, similar to the Schrödinger equation. Dirichlet boundary conditions (potential fixed at boundaries) are applied by modifying the corresponding rows and right-hand side vector of the linear system matrix.
+
+\paragraph{\texttt{spsolve}}
+The \texttt{spsolve} function from \texttt{scipy.sparse.linalg} is used to solve the sparse linear system arising from the discretized Poisson equation. \texttt{spsolve} is a direct solver, which means it computes an exact solution (up to machine precision) in a finite number of steps.
+
+\paragraph{GMRES}
+The \texttt{gmres} function from \texttt{scipy.sparse.linalg} implements the Generalized Minimal Residual (GMRES) method. GMRES is an iterative method for solving non-symmetric linear systems. It is particularly useful when the matrix is large and sparse, and a direct solver is not feasible.
+
+\paragraph{Spectral Method (FFT)}
+The spectral method solves the Poisson equation in Fourier space using Fast Fourier Transforms (FFTs). The equation \(\nabla^2 \phi = -\rho/\epsilon\) becomes \(-K^2 \Phi_k = -P_k/\epsilon\) in Fourier space, where \(K^2 = k_x^2 + k_y^2\), and \(\Phi_k, P_k\) are the Fourier transforms of \(\phi, \rho\). This method is efficient for uniform grids and periodic boundary conditions. The DC component (\(K=0\)) is handled separately by setting \(\Phi_k(0,0)=0\), which corresponds to setting the average potential to zero.
+
 \section{Conclusion}
 This simulation suite provides a flexible framework for modeling quantum dot devices formed by top gates on a 2DEG. By solving the Schrödinger and Poisson equations self-consistently, it can predict electron distributions, energy levels, and characteristic experimental signatures like pinch-off curves and charge stability diagrams under various gate configurations. The inclusion of different Poisson solvers and sweep strategies allows for exploration of numerical techniques and optimization of simulation performance.
 
