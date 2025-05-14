@@ -1,4 +1,6 @@
-# Self-Consistent Schrödinger-Poisson Solver
+# CMSC661 Final Project: \\ A Schrodinger-Poisson based simulator for semiconductor quantum dot devices
+
+Daniel Schug  
 
 This project implements a self-consistent Schrödinger-Poisson solver for simulating quantum transport in semiconductor devices. It includes both 1D and 2D simulations of quantum dots, and a charge stability simulation.
 
