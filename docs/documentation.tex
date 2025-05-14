@@ -7,6 +7,7 @@
 \usepackage{minted} % For better code highlighting if available, otherwise listings
 \usepackage{tikz} % Added for TikZ figures
 \usetikzlibrary{shapes.geometric, positioning, arrows.meta} % Added TikZ libraries and arrows.meta
+\usepackage{natbib} % Added for bibliography
 
 \geometry{a4paper, margin=1in}
 
@@ -20,7 +21,7 @@
 \newpage
 
 \section{Introduction}
-This document provides an overview of the physics and code structure for a suite of quantum dot simulators. These simulators solve the Schrödinger and Poisson equations self-consistently to model the behavior of electrons in semiconductor quantum dot devices. The suite includes tools for 1D and 2D simulations, as well as specialized simulations for pinch-off characteristics, charge stability diagrams, and Coulomb diamonds. The simulations are designed to mimic experiments performed on gated semiconductor nanostructures.
+This document provides an overview of the physics and code structure for a suite of quantum dot simulators. These simulators solve the Schrödinger and Poisson equations self-consistently to model the behavior of electrons in semiconductor quantum dot devices. The suite includes tools for 1D and 2D simulations, as well as specialized simulations for pinch-off characteristics, charge stability diagrams, and Coulomb diamonds. The simulations are designed to mimic experiments performed on gated semiconductor nanostructures \cite{example}.
 
 \section{Semiconductor Quantum Dot Devices}
 In the pursuit of scalable quantum computing architectures, essential requirements have been posed towards bridging the gap between the theoretical requirements of super-classical computing and the practical mechanisms which satisfy them. In recent years, quantum-dots (QDs) have emerged as a promising platform for the realization of scalable quantum computing. This platform consists of fabricating semiconductor devices which are capable of manipulating charges in a quantum well so as to establish coherent control of electron spins. Such devices vary in heterostructure and architecture, however commonly they require highly precise electronic control of the charge distribution throughout the device. A principal advantage of this approach is that it leverages existing semiconductor science and fabrication advancements, which have seen consistent improvements over the years in the context of classical computing and electronic technologies. Further, in contrast with alternative paradigms which have received considerable attention in recent years, QDs are sufficiently small and replicatable that scaling to thousands or even millions of qubits is a distinct possibility. Intrinsic to the paradigm offered by modern QD devices, control can be attained almost entirely through application of applied gate voltages, whereby \textit{plunger} and \textit{barrier} gates have been demonstrated to be capable of manipulating individual electrons.
