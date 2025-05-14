@@ -167,35 +167,7 @@ The Schrödinger and Poisson equations are discretized using the finite differen
 where $\psi_i$ is the value of $\psi$ at grid point $x_i$, and $dx$ is the grid spacing. In 2D, the Laplacian $\nabla^2 = \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2}$ is approximated using a 5-point stencil. This transforms the differential equations into a system of linear algebraic equations, which can be represented by sparse matrices.
 
 \subsection{Eigenvalue Solvers}
-The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently. The primary solvers used are \texttt{eigsh} and \texttt{lobpcg}, which are described in more detail below.
-
-\subsubsection{\texttt{eigsh} (ARPACK)}
-The \texttt{eigsh} function from \texttt{scipy.sparse.linalg} is used to solve the sparse matrix eigenvalue problem arising from the discretized Schrödinger equation. \texttt{eigsh} is a wrapper around the ARPACK library, which implements the Implicitly Restarted Arnoldi Method (IRAM).
-
-ARPACK is designed for finding a few eigenvalues and eigenvectors of large sparse matrices. It is particularly efficient for finding eigenvalues at the extreme ends of the spectrum (i.e., smallest or largest magnitude). The general idea behind the Arnoldi method is to construct an orthonormal basis of the Krylov subspace, which is then used to approximate the eigenvalues and eigenvectors of the original matrix.
-
-Key parameters for \texttt{eigsh} include:
-\begin{itemize}
-    \item \texttt{k}: The number of eigenvalues and eigenvectors to find.
-    \item \texttt{which}: Specifies which eigenvalues to find (e.g., \texttt{'SM'} for smallest magnitude, \texttt{'LM'} for largest magnitude).
-    \item \texttt{sigma}: Specifies a shift value for finding eigenvalues near a particular value. Using \texttt{sigma} can improve convergence for interior eigenvalues.
-    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
-    \item \texttt{maxiter}: The maximum number of iterations allowed.
-\end{itemize}
-
-\subsubsection{\texttt{lobpcg}}
-The \texttt{lobpcg} function from \texttt{scipy.sparse.linalg} implements the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) method. LOBPCG is an iterative method for finding the lowest (or highest) eigenvalues and corresponding eigenvectors of a symmetric (or Hermitian) matrix.
-
-LOBPCG is a block Krylov subspace method, which means it operates on a block of vectors simultaneously. This can lead to faster convergence compared to single-vector methods like the power method or the Lanczos method. The general idea is to iteratively refine an approximate solution by combining information from multiple search directions (block vectors) and using preconditioning to accelerate convergence.
-
-Key parameters for \texttt{lobpcg} include:
-\begin{itemize}
-    \item \texttt{X}: An initial guess for the eigenvectors. The shape of \texttt{X} determines the number of eigenvalues and eigenvectors to find.
-    \item \texttt{B}: A preconditioner matrix. A good preconditioner can significantly improve convergence.
-    \item \texttt{M}: A constraint matrix.
-    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
-    \item \texttt{maxiter}: The maximum number of iterations allowed.
-\end{itemize}
+The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{eigsh} for Hermitian matrices) are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently.
 
 \subsection{Linear System Solvers}
 The discretized Poisson equation becomes a linear system $A\phi = b$. Sparse linear solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{spsolve} for direct solution or iterative solvers like GMRES (\texttt{gmres}) or LGMRES (\texttt{lgmres}) as fallbacks) are used to find the potential $\phi$. Dirichlet boundary conditions are implemented by modifying the corresponding rows and right-hand side vector of the linear system matrix.
@@ -211,7 +183,7 @@ The performance of different numerical schemes for solving the Schrödinger-Pois
 
 Figure \ref{fig:benchmark_summary} shows a summary of the benchmark results across all scenarios. The plot illustrates the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration for each combination of solvers and scenarios. The number of converged samples out of the total number of samples is also indicated on the plot.
 
-Evidently the major bottleneck in this process is our Schrödinger solver, which demands the vast majority of the computation time. Also of interest, the spectral Poisson solver offers significant advantage over the FD method and should be considered where possible. Notably, it is possible that due to the way boundary conditions are handled, modifications to the domain may be necessary to ensure that undesirable artifacts are not induced due to the periodic boundary conditions posed.
+Evidently the major bottleneck in this process is our Schrödinger solver, which demands the vast majority of the computation time. This can be significantly remedied using the \texttt{lobpcg} method, which is a significant result. the Also of interest, the spectral Poisson solver offers significant advantage over the FD method and should be considered where possible. Notably, it is possible that due to the way boundary conditions are handled, modifications to the domain may be necessary to ensure that undesirable artifacts are not induced due to the periodic boundary conditions posed.
 \begin{figure}[h!]
 	\centering
 	\includegraphics[width=\textwidth]{../figures/my_benchmark_results.png}
@@ -280,6 +252,135 @@ The spectral method solves the Poisson equation in Fourier space using Fast Four
 This simulation suite demonstrates the possibility of crude modeling of quantum dot devices formed by top gates on a 2DEG. By solving the Schrödinger and Poisson equations self-consistently, it can predict electron distributions, energy levels, and characteristic experimental signatures like pinch-off curves and charge stability diagrams under various gate configurations. The inclusion of different Poisson solvers and sweep strategies allows for exploration of numerical techniques and optimization of simulation performance. Given the results of the benchmark, it is clear that improvements are needed in the area of sparse solvers in order to further accelerate the simulation, as these computations make up the vast majority of the simulation time. Further, a spectral solver is preferred where possible due to the considerable speed-up, however this should be done with some degree of caution due to the undesirable periodic boundary conditions. Ideal next steps include finding faster schemes for solving the Schrödinger equation, which may be aided by GPU-accelerated math libraries such as those provided by CUDA. This direction would also permit us to use the simpler FDM style solvers in all cases, which has the advantage of keeping the simulation simple. An additional, and critical next step is to incorporate some reasonable approximation to simulate current traces. While we have demonstrated the ability to simulate reasonable charge densities, in experiment we only recieve a current trace as measured on a lead. A good starting point for this would be to estimate path integrals using some Monte Carlo integration strategy.
 
 \newpage
+\section{Code Documentation}
+The simulation suite consists of several Python scripts, each tailored for specific types of simulations. They share common physical constants, material parameters, and core solver functions.
+
+\subsection{Common Elements}
+\subsubsection{Physical Constants and Material Parameters}
+All scripts define:
+\begin{itemize}
+	\item \textbf{Physical Constants}: $\hbar$ (hbar), $m_e$ (electron mass), $e$ (elementary charge), $\epsilon_0$ (vacuum permittivity).
+	\item \textbf{Material Parameters (GaAs)}: $m_{\text{eff}}$ (effective mass, $0.067 \cdot m_e$), $\epsilon_r$ (relative permittivity, $12.9$).
+\end{itemize}
+
+\subsubsection{Simulation Grid}
+A 1D or 2D numerical grid is defined:
+\begin{itemize}
+	\item \texttt{L} (1D) or \texttt{Lx}, \texttt{Ly} (2D): Length of the simulation domain.
+	\item \texttt{N} (1D) or \texttt{Nx}, \texttt{Ny} (2D): Number of grid points.
+	\item \texttt{x}, \texttt{y}: Arrays of grid point coordinates.
+	\item \texttt{dx}, \texttt{dy}: Grid spacing.
+\end{itemize}
+For 2D simulations, \texttt{X} and \texttt{Y} meshgrids are created using \texttt{np.meshgrid} with \texttt{indexing='ij'} to match matrix indexing conventions.
+
+\subsubsection{Core Functions}
+\begin{description}
+	\item[\texttt{get\_external\_potential(X, Y, voltages)}] Calculates the external potential profile based on gate voltages. Uses Gaussian profiles for each gate's influence, as described in Section 2.3. The \texttt{voltages} argument is a dictionary mapping gate names (e.g., "P1", "B2") to their applied voltage values.
+	\item[\texttt{solve\_schrodinger(potential)}] (1D) or \texttt{solve\_schrodinger\_2d(potential\_2d)}] Solves the time-independent Schrödinger equation using a finite difference method on a sparse matrix representation of the Hamiltonian. It finds the lowest few eigenvalues and corresponding eigenvectors using \texttt{scipy.sparse.linalg.eigsh}.
+	\item[\texttt{calculate\_charge\_density(eigenvalues, eigenvectors, fermi\_level)}] (1D) or \texttt{calculate\_charge\_density\_2d(eigenvalues, eigenvectors\_2d, fermi\_level)}] Calculates the electron charge density using the computed eigenvalues, eigenvectors, and the specified Fermi level, applying the Fermi-Dirac distribution (often in the zero-temperature limit).
+	\item[\texttt{solve\_poisson(charge\_density)}] (1D) or \texttt{solve\_poisson\_2d(charge\_density\_2d)}] Solves the Poisson equation using a finite difference method with Dirichlet boundary conditions (potential fixed at boundaries, typically to zero). It constructs a sparse matrix for the Laplacian operator and solves the linear system using \texttt{scipy.sparse.linalg.spsolve} or an iterative solver like GMRES as a fallback.
+	\item[\texttt{solve\_poisson\_2d\_spectral(charge\_density\_2d)}] (2D only) An alternative Poisson solver using spectral methods (Fast Fourier Transforms - FFTs). This method is efficient but inherently assumes periodic boundary conditions, which may not be physically appropriate for all device simulations compared to Dirichlet conditions.
+	\item[\texttt{self\_consistent\_solver(voltages, fermi\_level, ...)}] (1D) or \texttt{self\_consistent\_solver\_2d(voltages, fermi\_level, ...)}] Implements the self-consistent iteration loop described in Section 3.3. It takes applied gate voltages and the Fermi level as input and iteratively calls the Schrödinger and Poisson solvers, mixing the potential until convergence is reached. It returns the converged total potential, charge density, eigenvalues, and eigenvectors (or None if convergence fails). The 2D version allows selecting the Poisson solver type.
+\end{description}
+
+\subsection{\texttt{simulate\_1d\_dot.py}}
+This script performs a 1D Schrödinger-Poisson simulation for a quantum dot device.
+\begin{itemize}
+	\item \textbf{Purpose}: Simulates a 1D quantum dot, typically representing a cross-section or a simplified model of a double dot structure defined by plunger and barrier gates.
+	\item \textbf{Key Features}:
+	      \begin{itemize}
+		      \item Defines a 1D grid.
+		      \item \texttt{get\_external\_potential}: Models gates using 1D Gaussian potentials.
+		      \item Solves 1D Schrödinger and Poisson equations.
+		      \item Performs self-consistent calculation.
+		      \item Plots potential profiles, charge density, and wavefunctions.
+	      \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{simulate\_2d\_dot.py}}
+This script performs a standard 2D Schrödinger-Poisson simulation for a fixed set of gate voltages.
+\begin{itemize}
+	\item \textbf{Purpose}: Simulates a 2D quantum dot, allowing for more realistic device geometries and potential landscapes. It's useful for visualizing the electron distribution and energy levels for a specific gate configuration.
+	\item \textbf{Key Features}:
+	      \begin{itemize}
+		      \item Defines a 2D grid (\texttt{Nx}, \texttt{Ny}).
+		      \item \texttt{get\_external\_potential}: Models gates using 2D Gaussian potentials.
+		      \item \texttt{solve\_schrodinger\_2d}: Solves the 2D Schrödinger equation using a 5-point finite difference stencil.
+		      \item \texttt{solve\_poisson\_2d}: Solves the 2D Poisson equation using finite differences with Dirichlet boundary conditions.
+		      \item \texttt{solve\_poisson\_2d\_spectral}: An alternative spectral Poisson solver is available but not used by default in the main execution block.
+		      \item \texttt{self\_consistent\_solver\_2d}: Manages the 2D self-consistent loop. Allows selection of Poisson solver type.
+		      \item Plots 2D contour maps of total potential, external potential, charge density, and the ground state probability density. Includes visualization of gate positions as ellipses.
+	      \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{simulate\_pinchoff.py}}
+This script simulates the pinch-off characteristics of a quantum dot device by sweeping a gate voltage.
+\begin{itemize}
+	\item \textbf{Purpose}: To observe how the potential barrier under a gate changes as its voltage is swept, leading to channel pinch-off and depletion of electrons from the dot.
+	\item \textbf{Key Features}:
+	      \begin{itemize}
+		      \item Based on the 2D simulation framework.
+		      \item Sweeps the voltage of a specified gate (e.g., "B2") over a defined range.
+		      \item For each voltage point in the sweep:
+		            \begin{itemize}
+			            \item Runs the 2D self-consistent solver.
+			            \item Estimates the minimum potential under the swept gate (barrier height) by sampling a slice of the potential.
+			            \item Calculates the total number of electrons in the simulation domain by integrating the charge density.
+		            \end{itemize}
+		      \item Plots:
+		            \begin{itemize}
+			            \item Pinch-off curve: Minimum barrier potential vs. swept gate voltage.
+			            \item Number of electrons vs. swept gate voltage.
+			            \item Final potential landscape for the last voltage point simulated.
+		            \end{itemize}
+		      \item Allows selection between finite difference and spectral Poisson solvers for the self-consistent loop.
+	      \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{simulate\_charge\_stability.py}}
+This script simulates charge stability diagrams by sweeping two gate voltages.
+\begin{itemize}
+	\item \textbf{Purpose}: To map out regions of stable integer electron numbers in the quantum dot system as two plunger gate voltages are varied. This reveals the characteristic honeycomb pattern of charge stability, a signature of Coulomb blockade.
+	\item \textbf{Key Features}:
+	      \begin{itemize}
+		      \item Based on the 2D simulation framework, often with a reduced grid size (\texttt{Nx}, \texttt{Ny}) compared to \texttt{simulate\_2d\_dot.py} for faster computation over many voltage points.
+		      \item Sweeps two specified gate voltages (e.g., "P1", "P2") over 2D ranges.
+		      \item For each pair of (V\textsubscript{Gate1}, V\textsubscript{Gate2}) values:
+		            \begin{itemize}
+			            \item Runs the 2D self-consistent solver.
+			            \item Calculates the total number of electrons in the system by integrating the charge density using \texttt{calculate\_total\_electrons}.
+		            \end{itemize}
+		      \item Implements sweep strategies:
+		            \begin{itemize}
+			            \item \texttt{row\_by\_row}: Standard raster scan.
+			            \item \texttt{hilbert}: Sweeps points along a Hilbert space-filling curve using the \texttt{hilbertcurve} library. This strategy can improve convergence by using the converged potential from a nearby point in parameter space as a warm start (\texttt{initial\_potential\_V}) for the current point's self-consistent calculation. The \texttt{get\_hilbert\_order} function generates this sequence.
+		            \end{itemize}
+		      \item Stores the converged electrostatic potential from the previous point (in the chosen sweep order) to use as an initial guess (warm start) for the next point, potentially speeding up convergence, especially for the Hilbert sweep.
+		      \item Stores the total number of electrons for each voltage pair in a 2D map.
+		      \item Plots:
+		            \begin{itemize}
+			            \item A 2D color map of the total number of electrons as a function of the two swept gate voltages.
+			            \item An additional plot with rounded electron numbers to emphasize the integer plateaus and transitions.
+		            \end{itemize}
+		      \item Saves the raw data (voltages, electron map) to a `.npz` file and plots to image files in an output directory.
+		      \item Allows selection between finite difference and spectral Poisson solvers.
+	      \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{simulate\_coulomb\_diamonds.py}}
+This script simulates Coulomb diamonds, which are closely related to charge stability diagrams.
+\begin{itemize}
+	\item \textbf{Purpose}: Similar to charge stability, this script maps out electron number as a function of two gate voltages, typically used to identify Coulomb blockade regions and extract parameters like charging energy.
+	\item \textbf{Key Features}:
+	      \begin{itemize}
+		      \item Based on the 2D simulation framework.
+		      \item Sweeps two specified gate voltages (e.g., "P1", "P2").
+		      \item For each voltage pair, runs the self-consistent solver and calculates the total number of electrons.
+		      \item Plots a 2D color map of the electron number, forming the characteristic Coulomb diamond pattern.
+		      \item Uses a zero-temperature approximation for charge density calculation.
+		      \item Note: This script is a simplified version compared to \texttt{simulate\_charge\_stability.py} and does not include features like warm starts or different sweep strategies.
+	      \end{itemize}
+\end{itemize}
 
 
 \end{document}
