@@ -11,8 +11,8 @@
 
 \geometry{a4paper, margin=1in}
 
-\title{Quantum Dot Simulation Suite Documentation}
-\author{AI Software Developer}
+\title{CMSC661 Final Project: \\ A Schrodinger-Poisson based simulator for semiconductor quantum dot devices}
+\author{Daniel Schug}
 \date{\today}
 
 \begin{document}
@@ -21,9 +21,10 @@
 \newpage
 
 \section{Introduction}
-This document provides an overview of the physics and code structure for a suite of quantum dot simulators. These simulators solve the Schrödinger and Poisson equations self-consistently to model the behavior of electrons in semiconductor quantum dot devices. The suite includes tools for 1D and 2D simulations, as well as specialized simulations for pinch-off characteristics, charge stability diagrams, and Coulomb diamonds. The simulations are designed to mimic experiments performed on gated semiconductor nanostructures \cite{example}.
+This document provides an overview of the physics, numerical methods, and code for a suite of quantum dot simulators. These simulators solve the Schrödinger and Poisson equations self-consistently to model the behavior of electrons in semiconductor quantum dot devices. The suite includes tools for 1D and 2D simulations, as well as specialized simulations for pinch-off characteristics, charge stability diagrams, and Coulomb diamonds. The simulations are designed to mimic experiments performed on gate-defined semiconductor quantum dot devices.
 
 \section{Semiconductor Quantum Dot Devices}
+\subsection{Motivation}
 In the pursuit of scalable quantum computing architectures, essential requirements have been posed towards bridging the gap between the theoretical requirements of super-classical computing and the practical mechanisms which satisfy them. In recent years, quantum-dots (QDs) have emerged as a promising platform for the realization of scalable quantum computing. This platform consists of fabricating semiconductor devices which are capable of manipulating charges in a quantum well so as to establish coherent control of electron spins. Such devices vary in heterostructure and architecture, however commonly they require highly precise electronic control of the charge distribution throughout the device. A principal advantage of this approach is that it leverages existing semiconductor science and fabrication advancements, which have seen consistent improvements over the years in the context of classical computing and electronic technologies. Further, in contrast with alternative paradigms which have received considerable attention in recent years, QDs are sufficiently small and replicatable that scaling to thousands or even millions of qubits is a distinct possibility. Intrinsic to the paradigm offered by modern QD devices, control can be attained almost entirely through application of applied gate voltages, whereby \textit{plunger} and \textit{barrier} gates have been demonstrated to be capable of manipulating individual electrons.
 
 On the other hand, this platform offers numerous challenges. Due to the precise control required, small variations in semiconductor doping, wafer defects, or even external exposure to radiation can have a significant effect on the fidelity of qubits. Further, as device architectures grow, the ability to coherently manipulate large numbers of qubits becomes extremely challenging. At present, there is a considerable process involved in \textbf{tuning} a QD device so that it is able to coherently manipulate qubits. This process is highly manual, requiring expert query and refinement of the applied gate voltages needed to support the formation of usable qubits. This represents a significant challenge to the viability of this platform as a scalable quantum computing paradigm, as manual control of QD devices becomes exceedingly difficult as the number of controllable parameters grows. While developments to the inherent physics governing these devices have succeeded in reducing the variability expressed in such devices, namely through industrial improvements to fabrication, automatic control is necessary in order to manage the increasingly large devices which chart the path towards intermediate quantum processing capability.
@@ -93,7 +94,7 @@ The scripts model the gates using 2D (or 1D in \texttt{simulate\_1d\_dot.py}) Ga
 \begin{figure}[h!]
 	\centering
 	\includegraphics[width=\textwidth]{../figures/simulation_results.png}
-	\caption{Benchmark results for different Schrödinger-Poisson solver schemes across various scenarios. The plot shows the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration. The number of converged samples is also indicated.}
+	\caption{Demonstration of 1D quantum well induced by plunger-barrier potential differential}
 	\label{fig:sim1d}
 \end{figure}
 
@@ -134,8 +135,123 @@ The Schrödinger and Poisson equations are coupled: the potential in the Schröd
 This iterative process is repeated until convergence is achieved or a maximum number of iterations is reached.
 
 \section{Results}
-\subsection{}
+\subsection{2D Charge Density}
+The central building block of our simulation framework is the ability to simulate charge densities. Ultimately this gives us the ability to estimate physical quantities similar to those observed in experiment.
 
+We present a simple 2D charge density simulation in Figure \ref{fig:charge_density_2D}. Care must be taken that the fermi-level is set to some appropriate value to ensure that our simulation is able to observe those levels where electrons occupy.
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=\textwidth]{../figures/simulation_results_2d.png}
+	\caption{Simulated Charge Stability diagram.}
+	\label{fig:charge_density_2D}
+\end{figure}
+
+
+
+\subsection{Charge Stability Diagrams}
+While it is customary to use simple capacitance models for the purpose of simulating charge-stability diagrams, this can often produce results which are qualatatively innacurate, especially at higher modes where decoupling becomes more prominent. In the spirit of this framework, we demonstrate that it is possible to simulate charge-stability diagrams by
+We present a such a charge stability diagram in Figure \ref{fig:charge_stability_diagram} taken by sweeping from -0.1 V and 0.0 V on each plunger gate in our DQD. Notably, instead of performing a simple raster style sweep, we opt to utilize a Hilbert space-filling curve. This is done due in order to best utilize the warm-start component of our solver, since space-filling curves typically have more desirable locality characteristics than a simple raster-style sweep. This can be seen by considering what occurs at the end of each row in the raster approach, where the previous point will be on the other side of the device. It is worth noting that in experiment, these scans are almost exclusively taken using simple raster-style scans. Moreover, the resulting charge stability diagram is qualitatively representative of typical scans observed in experiment. We do not concern ourselves with calculating the individual dot occupation, since this would require solving two separate simulations for each dot, however the typical regions corresponding to the various dot occupations are clearly visible in the simulation.
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=\textwidth]{../figures/stability_results/charge_stability_P1_P2.png}
+	\caption{Simulated Charge Stability diagram.}
+	\label{fig:charge_stability_diagram}
+\end{figure}
+
+\section{Numerical Methods}
+\subsection{Finite Difference Method}
+The Schrödinger and Poisson equations are discretized using the finite difference method. For example, the second derivative $\frac{d^2\psi}{dx^2}$ is approximated as:
+\begin{equation}
+	\frac{d^2\psi}{dx^2} \approx \frac{\psi_{i+1} - 2\psi_i + \psi_{i-1}}{dx^2}
+\end{equation}
+where $\psi_i$ is the value of $\psi$ at grid point $x_i$, and $dx$ is the grid spacing. In 2D, the Laplacian $\nabla^2 = \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2}$ is approximated using a 5-point stencil. This transforms the differential equations into a system of linear algebraic equations, which can be represented by sparse matrices.
+
+\subsection{Eigenvalue Solvers}
+The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{eigsh} for Hermitian matrices) are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently.
+
+\subsection{Linear System Solvers}
+The discretized Poisson equation becomes a linear system $A\phi = b$. Sparse linear solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{spsolve} for direct solution or iterative solvers like GMRES (\texttt{gmres}) or LGMRES (\texttt{lgmres}) as fallbacks) are used to find the potential $\phi$. Dirichlet boundary conditions are implemented by modifying the corresponding rows and right-hand side vector of the linear system matrix.
+
+\subsection{Spectral Method (Poisson)}
+The \texttt{solve\_poisson\_2d\_spectral} function uses Fast Fourier Transforms (FFTs) to solve the Poisson equation in k-space. The equation $\nabla^2 \phi = -\rho/\epsilon$ becomes $-K^2 \Phi_k = -P_k/\epsilon$ in Fourier space, where $K^2 = k_x^2 + k_y^2$, and $\Phi_k, P_k$ are the Fourier transforms of $\phi, \rho$. This method is efficient for uniform grids and periodic boundary conditions. The DC component ($K=0$) is handled separately by setting $\Phi_k(0,0)=0$, which corresponds to setting the average potential to zero.
+
+\section{Benchmark Results and Numerical Schemes}
+
+\subsection{Benchmark Summary}
+
+The performance of different numerical schemes for solving the Schrödinger-Poisson equations was benchmarked using the \texttt{benchmark\_solver\_schemes.py} script. The script tests different Poisson solvers (Finite Difference, Spectral) and Schrödinger solvers (various configurations of \texttt{eigsh} and \texttt{lobpcg}) under different scenarios, including cold starts with random voltages and warm starts with perturbed voltages.
+
+Figure \ref{fig:benchmark_summary} shows a summary of the benchmark results across all scenarios. The plot illustrates the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration for each combination of solvers and scenarios. The number of converged samples out of the total number of samples is also indicated on the plot.
+
+Evidently the major bottleneck in this process is our Schrödinger solver, which demands the vast majority of the computation time. Also of interest, the spectral Poisson solver offers significant advantage over the FD method and should be considered where possible. Notably, it is possible that due to the way boundary conditions are handled, modifications to the domain may be necessary to ensure that undesirable artifacts are not induced due to the periodic boundary conditions posed.
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=\textwidth]{../figures/my_benchmark_results.png}
+	\caption{Benchmark results for different Schrödinger-Poisson solver schemes across various scenarios. The plot shows the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration. The number of converged samples is also indicated.}
+	\label{fig:benchmark_summary}
+\end{figure}
+
+\subsection{Numerical Schemes: Background and Implementation Details}
+
+The simulation suite employs several numerical schemes to solve the Schrödinger and Poisson equations. This section provides a brief overview of these schemes, including their background and implementation details.
+
+\subsubsection{Schrödinger Solvers}
+
+\paragraph{Finite Difference Method}
+The Schrödinger equation is discretized using the finite difference method (FDM). The second derivative is approximated using a central difference scheme:
+
+\[
+	\frac{d^2\psi}{dx^2} \approx \frac{\psi_{i+1} - 2\psi_i + \psi_{i-1}}{dx^2}
+\]
+
+In 2D, the Laplacian is approximated using a 5-point stencil. This discretization transforms the Schrödinger equation into a sparse matrix eigenvalue problem.
+
+\paragraph{\texttt{eigsh} (ARPACK)}
+The \texttt{eigsh} function from \texttt{scipy.sparse.linalg} is used to solve the sparse matrix eigenvalue problem arising from the discretized Schrödinger equation. \texttt{eigsh} is a wrapper around the ARPACK library, which implements the Implicitly Restarted Arnoldi Method (IRAM).
+
+ARPACK is designed for finding a few eigenvalues and eigenvectors of large sparse matrices. It is particularly efficient for finding eigenvalues at the extreme ends of the spectrum (i.e., smallest or largest magnitude).
+
+Key parameters for \texttt{eigsh} include:
+\begin{itemize}
+	\item \texttt{k}: The number of eigenvalues and eigenvectors to find.
+	\item \texttt{which}: Specifies which eigenvalues to find (e.g., \texttt{'SM'} for smallest magnitude, \texttt{'LM'} for largest magnitude).
+	\item \texttt{sigma}: Specifies a shift value for finding eigenvalues near a particular value. Using \texttt{sigma} can improve convergence for interior eigenvalues.
+	\item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+	\item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
+
+\paragraph{\texttt{lobpcg}}
+The \texttt{lobpcg} function from \texttt{scipy.sparse.linalg} implements the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) method. LOBPCG is an iterative method for finding the lowest (or highest) eigenvalues and corresponding eigenvectors of a symmetric (or Hermitian) matrix.
+
+LOBPCG is a block Krylov subspace method, which means it operates on a block of vectors simultaneously. This can lead to faster convergence compared to single-vector methods like the power method or the Lanczos method.
+
+Key parameters for \texttt{lobpcg} include:
+\begin{itemize}
+	\item \texttt{X}: An initial guess for the eigenvectors. The shape of \texttt{X} determines the number of eigenvalues and eigenvectors to find.
+	\item \texttt{B}: A preconditioner matrix. A good preconditioner can significantly improve convergence.
+	\item \texttt{M}: A constraint matrix.
+	\item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+	\item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
+
+\subsubsection{Poisson Solvers}
+
+\paragraph{Finite Difference Method}
+The Poisson equation is also discretized using the finite difference method. The Laplacian is approximated using a central difference scheme, similar to the Schrödinger equation. Dirichlet boundary conditions (potential fixed at boundaries) are applied by modifying the corresponding rows and right-hand side vector of the linear system matrix.
+
+\paragraph{\texttt{spsolve}}
+The \texttt{spsolve} function from \texttt{scipy.sparse.linalg} is used to solve the sparse linear system arising from the discretized Poisson equation. \texttt{spsolve} is a direct solver, which means it computes an exact solution (up to machine precision) in a finite number of steps.
+
+\paragraph{GMRES}
+The \texttt{gmres} function from \texttt{scipy.sparse.linalg} implements the Generalized Minimal Residual (GMRES) method. GMRES is an iterative method for solving non-symmetric linear systems. It is particularly useful when the matrix is large and sparse, and a direct solver is not feasible.
+
+\paragraph{Spectral Method (FFT)}
+The spectral method solves the Poisson equation in Fourier space using Fast Fourier Transforms (FFTs). The equation \(\nabla^2 \phi = -\rho/\epsilon\) becomes \(-K^2 \Phi_k = -P_k/\epsilon\) in Fourier space, where \(K^2 = k_x^2 + k_y^2\), and \(\Phi_k, P_k\) are the Fourier transforms of \(\phi, \rho\). This method is efficient for uniform grids and periodic boundary conditions. The DC component (\(K=0\)) is handled separately by setting \(\Phi_k(0,0)=0\), which corresponds to setting the average potential to zero.
+
+\section{Conclusion}
+This simulation suite demonstrates the possibility of crude modeling of quantum dot devices formed by top gates on a 2DEG. By solving the Schrödinger and Poisson equations self-consistently, it can predict electron distributions, energy levels, and characteristic experimental signatures like pinch-off curves and charge stability diagrams under various gate configurations. The inclusion of different Poisson solvers and sweep strategies allows for exploration of numerical techniques and optimization of simulation performance. Given the results of the benchmark, it is clear that improvements are needed in the area of sparse solvers in order to further accelerate the simulation, as these computations make up the vast majority of the simulation time. Further, a spectral solver is preferred where possible due to the considerable speed-up, however this should be done with some degree of caution due to the undesirable periodic boundary conditions. Ideal next steps include finding faster schemes for solving the Schrödinger equation, which may be aided by GPU-accelerated math libraries such as those provided by CUDA. This direction would also permit us to use the simpler FDM style solvers in all cases, which has the advantage of keeping the simulation simple. An additional, and critical next step is to incorporate some reasonable approximation to simulate current traces. While we have demonstrated the ability to simulate reasonable charge densities, in experiment we only recieve a current trace as measured on a lead. A good starting point for this would be to estimate path integrals using some Monte Carlo integration strategy.
+
+\newpage
 \section{Code Documentation}
 The simulation suite consists of several Python scripts, each tailored for specific types of simulations. They share common physical constants, material parameters, and core solver functions.
 
@@ -266,96 +382,5 @@ This script simulates Coulomb diamonds, which are closely related to charge stab
 	      \end{itemize}
 \end{itemize}
 
-\section{Numerical Methods}
-\subsection{Finite Difference Method}
-The Schrödinger and Poisson equations are discretized using the finite difference method. For example, the second derivative $\frac{d^2\psi}{dx^2}$ is approximated as:
-\begin{equation}
-	\frac{d^2\psi}{dx^2} \approx \frac{\psi_{i+1} - 2\psi_i + \psi_{i-1}}{dx^2}
-\end{equation}
-where $\psi_i$ is the value of $\psi$ at grid point $x_i$, and $dx$ is the grid spacing. In 2D, the Laplacian $\nabla^2 = \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2}$ is approximated using a 5-point stencil. This transforms the differential equations into a system of linear algebraic equations, which can be represented by sparse matrices.
-
-\subsection{Eigenvalue Solvers}
-The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{eigsh} for Hermitian matrices) are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently.
-
-\subsection{Linear System Solvers}
-The discretized Poisson equation becomes a linear system $A\phi = b$. Sparse linear solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{spsolve} for direct solution or iterative solvers like GMRES (\texttt{gmres}) or LGMRES (\texttt{lgmres}) as fallbacks) are used to find the potential $\phi$. Dirichlet boundary conditions are implemented by modifying the corresponding rows and right-hand side vector of the linear system matrix.
-
-\subsection{Spectral Method (Poisson)}
-The \texttt{solve\_poisson\_2d\_spectral} function uses Fast Fourier Transforms (FFTs) to solve the Poisson equation in k-space. The equation $\nabla^2 \phi = -\rho/\epsilon$ becomes $-K^2 \Phi_k = -P_k/\epsilon$ in Fourier space, where $K^2 = k_x^2 + k_y^2$, and $\Phi_k, P_k$ are the Fourier transforms of $\phi, \rho$. This method is efficient for uniform grids and periodic boundary conditions. The DC component ($K=0$) is handled separately by setting $\Phi_k(0,0)=0$, which corresponds to setting the average potential to zero.
-
-\section{Benchmark Results and Numerical Schemes}
-
-\subsection{Benchmark Summary}
-
-The performance of different numerical schemes for solving the Schrödinger-Poisson equations was benchmarked using the \texttt{benchmark\_solver\_schemes.py} script. The script tests different Poisson solvers (Finite Difference, Spectral) and Schrödinger solvers (various configurations of \texttt{eigsh} and \texttt{lobpcg}) under different scenarios, including cold starts with random voltages and warm starts with perturbed voltages.
-
-Figure \ref{fig:benchmark_summary} shows a summary of the benchmark results across all scenarios. The plot illustrates the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration for each combination of solvers and scenarios. The number of converged samples out of the total number of samples is also indicated on the plot.
-
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=\textwidth]{../figures/benchmark_summary_all_scenarios.png}
-	\caption{Benchmark results for different Schrödinger-Poisson solver schemes across various scenarios. The plot shows the average total time, average Schrödinger solver time per iteration, and average Poisson solver time per iteration. The number of converged samples is also indicated.}
-	\label{fig:benchmark_summary}
-\end{figure}
-
-\subsection{Numerical Schemes: Background and Implementation Details}
-
-The simulation suite employs several numerical schemes to solve the Schrödinger and Poisson equations. This section provides a brief overview of these schemes, including their background and implementation details.
-
-\subsubsection{Schrödinger Solvers}
-
-\paragraph{Finite Difference Method}
-The Schrödinger equation is discretized using the finite difference method (FDM). The second derivative is approximated using a central difference scheme:
-
-\[
-	\frac{d^2\psi}{dx^2} \approx \frac{\psi_{i+1} - 2\psi_i + \psi_{i-1}}{dx^2}
-\]
-
-In 2D, the Laplacian is approximated using a 5-point stencil. This discretization transforms the Schrödinger equation into a sparse matrix eigenvalue problem.
-
-\paragraph{\texttt{eigsh} (ARPACK)}
-The \texttt{eigsh} function from \texttt{scipy.sparse.linalg} is used to solve the sparse matrix eigenvalue problem arising from the discretized Schrödinger equation. \texttt{eigsh} is a wrapper around the ARPACK library, which implements the Implicitly Restarted Arnoldi Method (IRAM).
-
-ARPACK is designed for finding a few eigenvalues and eigenvectors of large sparse matrices. It is particularly efficient for finding eigenvalues at the extreme ends of the spectrum (i.e., smallest or largest magnitude).
-
-Key parameters for \texttt{eigsh} include:
-\begin{itemize}
-	\item \texttt{k}: The number of eigenvalues and eigenvectors to find.
-	\item \texttt{which}: Specifies which eigenvalues to find (e.g., \texttt{'SM'} for smallest magnitude, \texttt{'LM'} for largest magnitude).
-	\item \texttt{sigma}: Specifies a shift value for finding eigenvalues near a particular value. Using \texttt{sigma} can improve convergence for interior eigenvalues.
-	\item \texttt{tol}: The desired relative accuracy for the eigenvalues.
-	\item \texttt{maxiter}: The maximum number of iterations allowed.
-\end{itemize}
-
-\paragraph{\texttt{lobpcg}}
-The \texttt{lobpcg} function from \texttt{scipy.sparse.linalg} implements the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) method. LOBPCG is an iterative method for finding the lowest (or highest) eigenvalues and corresponding eigenvectors of a symmetric (or Hermitian) matrix.
-
-LOBPCG is a block Krylov subspace method, which means it operates on a block of vectors simultaneously. This can lead to faster convergence compared to single-vector methods like the power method or the Lanczos method.
-
-Key parameters for \texttt{lobpcg} include:
-\begin{itemize}
-	\item \texttt{X}: An initial guess for the eigenvectors. The shape of \texttt{X} determines the number of eigenvalues and eigenvectors to find.
-	\item \texttt{B}: A preconditioner matrix. A good preconditioner can significantly improve convergence.
-	\item \texttt{M}: A constraint matrix.
-	\item \texttt{tol}: The desired relative accuracy for the eigenvalues.
-	\item \texttt{maxiter}: The maximum number of iterations allowed.
-\end{itemize}
-
-\subsubsection{Poisson Solvers}
-
-\paragraph{Finite Difference Method}
-The Poisson equation is also discretized using the finite difference method. The Laplacian is approximated using a central difference scheme, similar to the Schrödinger equation. Dirichlet boundary conditions (potential fixed at boundaries) are applied by modifying the corresponding rows and right-hand side vector of the linear system matrix.
-
-\paragraph{\texttt{spsolve}}
-The \texttt{spsolve} function from \texttt{scipy.sparse.linalg} is used to solve the sparse linear system arising from the discretized Poisson equation. \texttt{spsolve} is a direct solver, which means it computes an exact solution (up to machine precision) in a finite number of steps.
-
-\paragraph{GMRES}
-The \texttt{gmres} function from \texttt{scipy.sparse.linalg} implements the Generalized Minimal Residual (GMRES) method. GMRES is an iterative method for solving non-symmetric linear systems. It is particularly useful when the matrix is large and sparse, and a direct solver is not feasible.
-
-\paragraph{Spectral Method (FFT)}
-The spectral method solves the Poisson equation in Fourier space using Fast Fourier Transforms (FFTs). The equation \(\nabla^2 \phi = -\rho/\epsilon\) becomes \(-K^2 \Phi_k = -P_k/\epsilon\) in Fourier space, where \(K^2 = k_x^2 + k_y^2\), and \(\Phi_k, P_k\) are the Fourier transforms of \(\phi, \rho\). This method is efficient for uniform grids and periodic boundary conditions. The DC component (\(K=0\)) is handled separately by setting \(\Phi_k(0,0)=0\), which corresponds to setting the average potential to zero.
-
-\section{Conclusion}
-This simulation suite provides a flexible framework for modeling quantum dot devices formed by top gates on a 2DEG. By solving the Schrödinger and Poisson equations self-consistently, it can predict electron distributions, energy levels, and characteristic experimental signatures like pinch-off curves and charge stability diagrams under various gate configurations. The inclusion of different Poisson solvers and sweep strategies allows for exploration of numerical techniques and optimization of simulation performance.
 
 \end{document}
