@@ -12,7 +12,16 @@ import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
-import numpy.fft as fft # Added for spectral methods
+import numpy.fft as fft  # Added for spectral methods
+
+plt.rcParams.update(
+    {
+        "text.usetex": True,  # Use LaTeX for text rendering
+        "font.family": "serif",  # Set the font family to serif
+        "font.serif": ["Times New Roman"],  # Specify the serif font
+        "font.size": 12,  # Set the default font size - Adjusted for better readability in subplots
+    }
+)
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -44,13 +53,14 @@ X, Y = np.meshgrid(
 # Define k-space grid for spectral methods (assuming periodic boundary conditions)
 kx = 2 * np.pi * fft.fftfreq(Nx, d=dx)
 ky = 2 * np.pi * fft.fftfreq(Ny, d=dy)
-Kx, Ky = np.meshgrid(kx, ky, indexing='ij')
+Kx, Ky = np.meshgrid(kx, ky, indexing="ij")
 K_sq = Kx**2 + Ky**2
 # Avoid division by zero at K=0 (DC component).
 # For periodic BCs, the DC component of the potential is arbitrary; setting it to 0 is common.
 # The inverse Laplacian of the DC component is undefined, so we handle it separately.
 # Replace K_sq[0,0] with a small non-zero value or handle the DC term explicitly in the solver.
 # Handling explicitly in the solver is cleaner.
+
 
 # --- Device Parameters ---
 def get_external_potential(X, Y, voltages):
@@ -273,6 +283,7 @@ def solve_poisson_2d(charge_density_2d):
     phi_2d = phi_flat.reshape((Nx, Ny), order="C")
     return phi_2d  # Electrostatic potential in Volts
 
+
 # --- Poisson Solver (2D) - Spectral Method ---
 def solve_poisson_2d_spectral(charge_density_2d):
     """
@@ -289,19 +300,26 @@ def solve_poisson_2d_spectral(charge_density_2d):
     # Setting phi_k[0,0] = 0 corresponds to zero average potential.
     # Create a copy of K_sq to avoid modifying the global variable
     K_sq_solver = K_sq.copy()
-    K_sq_solver[0, 0] = 1.0 # Set to 1 to avoid division by zero for the DC term
+    K_sq_solver[0, 0] = 1.0  # Set to 1 to avoid division by zero for the DC term
 
     phi_k = -rho_k / (epsilon * K_sq_solver)
-    phi_k[0, 0] = 0.0 # Explicitly set DC component to zero
+    phi_k[0, 0] = 0.0  # Explicitly set DC component to zero
 
     # 3. Inverse FFT to get potential in real space
-    phi_2d = fft.ifft2(phi_k).real # Take real part as potential is real
+    phi_2d = fft.ifft2(phi_k).real  # Take real part as potential is real
 
-    return phi_2d # Electrostatic potential in Volts
+    return phi_2d  # Electrostatic potential in Volts
 
 
 # --- Self-Consistent Iteration (2D) ---
-def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixing=0.1, poisson_solver_type="finite_difference"):
+def self_consistent_solver_2d(
+    voltages,
+    fermi_level,
+    max_iter=50,
+    tol=1e-5,
+    mixing=0.1,
+    poisson_solver_type="finite_difference",
+):
     """
     Performs the self-consistent 2D Schrödinger-Poisson calculation.
     Allows choosing the Poisson solver ('finite_difference' or 'spectral').
@@ -336,9 +354,11 @@ def self_consistent_solver_2d(voltages, fermi_level, max_iter=50, tol=1e-5, mixi
         if poisson_solver_type == "finite_difference":
             new_electrostatic_potential_V = solve_poisson_2d(new_charge_density)
         elif poisson_solver_type == "spectral":
-             # Note: Spectral solver assumes periodic boundary conditions,
+            # Note: Spectral solver assumes periodic boundary conditions,
             # which may differ from the desired physics (Dirichlet).
-            new_electrostatic_potential_V = solve_poisson_2d_spectral(new_charge_density)
+            new_electrostatic_potential_V = solve_poisson_2d_spectral(
+                new_charge_density
+            )
         else:
             raise ValueError(f"Unknown poisson_solver_type: {poisson_solver_type}")
 
@@ -396,7 +416,7 @@ if __name__ == "__main__":
 
     # Define Fermi level (relative to minimum external potential)
     ext_pot_J = get_external_potential(X, Y, applied_voltages)
-    fermi_level_J = np.min(ext_pot_J) + 0.01 * e  # Example: 10 meV above min potential
+    fermi_level_J = np.min(ext_pot_J) + 0.08 * e  # Example: 10 meV above min potential
 
     # Run the self-consistent solver
     # Add poisson_solver_type='finite_difference' or 'spectral' here
@@ -407,7 +427,7 @@ if __name__ == "__main__":
             max_iter=30,
             tol=1e-4,
             mixing=0.05,  # Reduced max_iter, tol, mixing for speed
-            poisson_solver_type="finite_difference", # Choose the solver here
+            poisson_solver_type="finite_difference",  # Choose the solver here
         )
     )
 
@@ -482,7 +502,7 @@ if __name__ == "__main__":
         add_gate_patches(ax1)  # Add gate visualization
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
-        plt.title("Self-Consistent Potential & Gates")
+        plt.title("Self-Consistent Potential \& Gates")
         plt.axis("equal")
 
         # Plot 2: External Potential Energy Profile (Contour)
@@ -494,7 +514,7 @@ if __name__ == "__main__":
         add_gate_patches(ax2)  # Add gate visualization
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
-        plt.title("External Potential & Gates")
+        plt.title("External Potential \& Gates")
         plt.axis("equal")
 
         # Plot 3: Charge Density (Contour/Image)
@@ -508,7 +528,7 @@ if __name__ == "__main__":
             extent=[0, Lx * 1e9, 0, Ly * 1e9],
             cmap="hot",
         )
-        plt.colorbar(im, label="Electron Density (electrons/nm²)")
+        plt.colorbar(im, label="Electron Density (electrons/nm$^2$)")
         plt.xlabel("x (nm)")
         plt.ylabel("y (nm)")
         plt.title("Electron Density")
@@ -526,11 +546,11 @@ if __name__ == "__main__":
                 extent=[0, Lx * 1e9, 0, Ly * 1e9],
                 cmap="Blues",
             )
-            plt.colorbar(im_psi, label="|Ψ₀|² (arb. units)")
+            plt.colorbar(im_psi, label="$|\phi|^2$ (arb. units)")
             plt.xlabel("x (nm)")
             plt.ylabel("y (nm)")
             plt.title(
-                f"Ground State Probability Density (E₀ = {eigenvalues[0] / e:.4f} eV)"
+                f"Ground State Probability Density ($E_0$ = {eigenvalues[0] / e:.4f} eV)"
             )
 
         plt.tight_layout()

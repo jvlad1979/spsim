@@ -8,6 +8,7 @@ Modified to simulate charge stability diagrams by sweeping two gate voltages.
 
 import numpy as np
 import matplotlib.pyplot as plt
+
 # matplotlib.patches was not used.
 import time
 import os
@@ -20,6 +21,15 @@ from spsim.simulation_runtime.sc_solver import self_consistent_solver_2d
 from spsim.measurement_helpers.sweep_utils import get_hilbert_order
 
 
+plt.rcParams.update(
+    {
+        "text.usetex": True,  # Use LaTeX for text rendering
+        "font.family": "serif",  # Set the font family to serif
+        "font.serif": ["Times New Roman"],  # Specify the serif font
+        "font.size": 12,  # Set the default font size - Adjusted for better readability in subplots
+    }
+)
+
 # --- Physical Constants ---
 hbar = constants.hbar
 m_e = constants.m_e
@@ -30,7 +40,7 @@ epsilon_0 = constants.epsilon_0
 # These are now taken directly from spsim.constants where they are pre-calculated or defined
 m_eff = constants.m_eff  # Effective mass
 eps_r = constants.eps_r  # Relative permittivity
-epsilon = constants.epsilon # Permittivity of material
+epsilon = constants.epsilon  # Permittivity of material
 
 # --- Simulation Grid ---
 # Reduced grid for faster stability diagram calculation
@@ -114,7 +124,9 @@ if __name__ == "__main__":
         np.min(initial_ext_pot_J) + 0.05 * e
     )  # Example: 50 meV above min potential
 
-    print("\n--- Starting Charge Stability Diagram Simulation (using spsim package) ---")
+    print(
+        "\n--- Starting Charge Stability Diagram Simulation (using spsim package) ---"
+    )
     print(
         f"Sweeping {gate1_name} from {gate1_voltages[0]:.3f} V to {gate1_voltages[-1]:.3f} V ({num_v1} points)"
     )
@@ -135,7 +147,7 @@ if __name__ == "__main__":
 
     # --- Choose Sweep Strategy ---
     # Options: 'row_by_row', 'hilbert'
-    sweep_strategy = "hilbert" # Change this to 'row_by_row' for the original behavior
+    sweep_strategy = "hilbert"  # Change this to 'row_by_row' for the original behavior
 
     # Initialize warm start potential variable for Hilbert sweep
     potential_from_previous_point = None
@@ -165,13 +177,15 @@ if __name__ == "__main__":
             )
 
             # Determine warm start potential
-            warm_start_potential = potential_from_previous_point # Default to previous Hilbert point
+            warm_start_potential = (
+                potential_from_previous_point  # Default to previous Hilbert point
+            )
 
             # Check grid neighbor (i-1, j) if available and successful
             # This adds consideration of a direct grid neighbor
-            if i > 0 and converged_potentials_map[i-1][j] is not None:
+            if i > 0 and converged_potentials_map[i - 1][j] is not None:
                 # print(f"  Using grid neighbor ({i-1},{j}) as warm start.") # Optional: uncomment for debugging
-                warm_start_potential = converged_potentials_map[i-1][j]
+                warm_start_potential = converged_potentials_map[i - 1][j]
             # Could add check for (i, j-1) as well, but prioritizing one is simpler for now.
 
             # Run the self-consistent solver using spsim.simulation_runtime.sc_solver
@@ -179,35 +193,48 @@ if __name__ == "__main__":
             sc_results = self_consistent_solver_2d(
                 voltages=current_voltages,
                 fermi_level=fermi_level_J,
-                Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
+                Nx=Nx,
+                Ny=Ny,
+                Lx=Lx,
+                Ly=Ly,
+                dx=dx,
+                dy=dy,  # Grid parameters
                 max_iter=30,  # From original script's call
-                tol=1e-4,    # From original script's call
+                tol=1e-4,  # From original script's call
                 mixing=0.1,  # From original script's call
-                verbose=False, # From original script's call
+                verbose=False,  # From original script's call
                 initial_potential_V=warm_start_potential,
-                poisson_solver_type="finite_difference", # From original script's call
-                schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
+                poisson_solver_type="finite_difference",  # From original script's call
+                schrodinger_solver_config=None,  # Use default spsim Schrödinger solver settings
             )
 
             # sc_results is now (final_charge_density, final_electrostatic_potential_V)
             # or (None, None) on failure
-            final_charge_density, converged_potential_V = sc_results # Unpack the results
+            final_charge_density, converged_potential_V = (
+                sc_results  # Unpack the results
+            )
 
-            if final_charge_density is not None: # Check if charge density is not None
+            if final_charge_density is not None:  # Check if charge density is not None
                 # Call to spsim's calculate_total_electrons requires dx, dy
-                total_electrons = calculate_total_electrons(final_charge_density, dx, dy)
-                total_electron_map[i, j] = total_electrons # Store using original grid indices
+                total_electrons = calculate_total_electrons(
+                    final_charge_density, dx, dy
+                )
+                total_electron_map[i, j] = (
+                    total_electrons  # Store using original grid indices
+                )
 
                 # Use the returned converged potential directly for the next warm start
                 converged_potentials_map[i][j] = converged_potential_V
-                potential_from_previous_point = converged_potential_V # Update for next Hilbert point
+                potential_from_previous_point = (
+                    converged_potential_V  # Update for next Hilbert point
+                )
                 print(f"  -> Total Electrons: {total_electrons:.3f}")
             else:
                 print(
                     f"  -> Simulation failed for point ({i + 1},{j + 1}) using spsim. Storing NaN."
                 )
                 total_electron_map[i, j] = np.nan
-                converged_potentials_map[i][j] = None # Store None for failed points
+                converged_potentials_map[i][j] = None  # Store None for failed points
                 # Don't update potential_from_previous_point if failed
 
             completed_points += 1
@@ -221,10 +248,10 @@ if __name__ == "__main__":
 
     elif sweep_strategy == "row_by_row":
         print("Using row-by-row sweep strategy...")
-        potential_from_previous_point_in_row = None # Specific to row strategy
+        potential_from_previous_point_in_row = None  # Specific to row strategy
 
         for i, v1 in enumerate(gate1_voltages):
-            potential_from_previous_point_in_row = None # Reset for each new row
+            potential_from_previous_point_in_row = None  # Reset for each new row
 
             for j, v2 in enumerate(gate2_voltages):
                 point_start_time = time.time()
@@ -241,28 +268,40 @@ if __name__ == "__main__":
                 sc_results = self_consistent_solver_2d(
                     voltages=current_voltages,
                     fermi_level=fermi_level_J,
-                    Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy, # Grid parameters
+                    Nx=Nx,
+                    Ny=Ny,
+                    Lx=Lx,
+                    Ly=Ly,
+                    dx=dx,
+                    dy=dy,  # Grid parameters
                     max_iter=30,  # From original script's call
-                    tol=1e-4,    # From original script's call
+                    tol=1e-4,  # From original script's call
                     mixing=0.1,  # From original script's call
-                    verbose=False, # From original script's call
-                    initial_potential_V=potential_from_previous_point_in_row, # Use potential from previous point in row
+                    verbose=False,  # From original script's call
+                    initial_potential_V=potential_from_previous_point_in_row,  # Use potential from previous point in row
                     poisson_solver_type="finite_difference",
-                    schrodinger_solver_config=None # Use default spsim Schrödinger solver settings
+                    schrodinger_solver_config=None,  # Use default spsim Schrödinger solver settings
                 )
 
                 # sc_results is now (final_charge_density, final_electrostatic_potential_V)
                 # or (None, None) on failure
-                final_charge_density, converged_potential_V = sc_results # Unpack the results
+                final_charge_density, converged_potential_V = (
+                    sc_results  # Unpack the results
+                )
 
-
-                if final_charge_density is not None: # Check if charge density is not None
+                if (
+                    final_charge_density is not None
+                ):  # Check if charge density is not None
                     # Call to spsim's calculate_total_electrons requires dx, dy
-                    total_electrons = calculate_total_electrons(final_charge_density, dx, dy)
+                    total_electrons = calculate_total_electrons(
+                        final_charge_density, dx, dy
+                    )
                     total_electron_map[i, j] = total_electrons
                     print(f"  -> Total Electrons: {total_electrons:.3f}")
                     # Use the returned converged potential directly for the next warm start
-                    potential_from_previous_point_in_row = converged_potential_V # Update for next point in row
+                    potential_from_previous_point_in_row = (
+                        converged_potential_V  # Update for next point in row
+                    )
                 else:
                     print(
                         f"  -> Simulation failed for point ({i + 1},{j + 1}) using spsim. Storing NaN."

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/TeX Live for SUSE Linux) (preloaded format=pdflatex 2025.4.7)  13 MAY 2025 10:47
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/TeX Live for SUSE Linux) (preloaded format=pdflatex 2025.4.7)  14 MAY 2025 12:11
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -676,32 +676,39 @@ File: pgflibraryarrows.meta.code.tex 2023-01-15 v3.1.10 (3.1.10)
 \pgfarrowwidth=\dimen288
 \pgfarrowlinewidth=\dimen289
 )
+(/usr/share/texmf/tex/latex/natbib/natbib.sty
+Package: natbib 2010/09/13 8.31b (PWD, AO)
+\bibhang=\skip56
+\bibsep=\skip57
+LaTeX Info: Redefining \cite on input line 694.
+\c@NAT@ctr=\count354
+)
 (/usr/share/texmf/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count354
+\l__color_backend_stack_int=\count355
 \l__pdf_internal_box=\box76
 )
 (./documentation.aux)
 \openout1 = `documentation.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 17.
-LaTeX Font Info:    ... okay on input line 17.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 18.
+LaTeX Font Info:    ... okay on input line 18.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -739,16 +746,16 @@ LaTeX Font Info:    ... okay on input line 17.
 
 (/usr/share/texmf/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count355
+\scratchcounter=\count356
 \scratchdimen=\dimen290
 \scratchbox=\box77
-\nofMPsegments=\count356
-\nofMParguments=\count357
+\nofMPsegments=\count357
+\nofMParguments=\count358
 \everyMPshowfont=\toks43
-\MPscratchCnt=\count358
+\MPscratchCnt=\count359
 \MPscratchDim=\dimen291
-\MPnumerator=\count359
-\makeMPintoPDFobject=\count360
+\MPnumerator=\count360
+\makeMPintoPDFobject=\count361
 \everyMPtoPDFconversion=\toks44
 ) (/usr/share/texmf/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
@@ -759,7 +766,7 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
-Package hyperref Info: Link coloring OFF on input line 17.
+Package hyperref Info: Link coloring OFF on input line 18.
  (./documentation.out) (./documentation.out)
 \@outlinefile=\write5
 \openout5 = `documentation.out'.
@@ -767,7 +774,7 @@ Package hyperref Info: Link coloring OFF on input line 17.
  (/usr/share/texmf/tex/latex/base/textcomp.sty
 Package: textcomp 2024/04/24 v2.1b Standard LaTeX package
 )
-\c@lstlisting=\count361
+\c@lstlisting=\count362
 
 (./documentation.toc)
 \tf@toc=\write6
@@ -779,64 +786,61 @@ Package: textcomp 2024/04/24 v2.1b Standard LaTeX package
 
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
 
-[2
+[2]
+<../figures/simulation_results.png, id=197, 867.24pt x 578.16pt>
+File: ../figures/simulation_results.png Graphic file (type png)
+<use ../figures/simulation_results.png>
+Package pdftex.def Info: ../figures/simulation_results.png  used on input line 
+96.
+(pdftex.def)             Requested size: 452.9679pt x 301.97705pt.
+
+
+LaTeX Warning: `!h' float specifier changed to `!ht'.
+
+
+
+[3
 pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.88 
-     {/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+l.106 \subsection
+                 {Schrödinger Equation}{/usr/share/texmf/fonts/enc/dvips/cm-su
+per/cm-super-ts1.enc}]
 
-[3
+[4
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.171 
-      ]
-LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 208.
+l.123 
+       <../figures/simulation_results.png>]
+<../figures/simulation_results_2d.png, id=221, 1084.05pt x 722.7pt>
+File: ../figures/simulation_results_2d.png Graphic file (type png)
+<use ../figures/simulation_results_2d.png>
+Package pdftex.def Info: ../figures/simulation_results_2d.png  used on input li
+ne 144.
+(pdftex.def)             Requested size: 452.9679pt x 301.97705pt.
 
 
-[4]
-Overfull \hbox (31.59288pt too wide) in paragraph at lines 209--210
-[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 solve[]schrodinger[]2d(potential[]2d
-)\OT1/cmr/m/n/10 ] Solves the time-independent
- []
+LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-
-Overfull \hbox (73.74457pt too wide) in paragraph at lines 209--210
-\OT1/cmr/m/n/10 Hamil-to-nian. It finds the low-est few eigen-val-ues and cor-r
-e-spond-ing eigen-vec-tors us-ing \OT1/cmtt/m/n/10 scipy.sparse.linalg.eigsh\OT
-1/cmr/m/n/10 . 
- []
-
-
-Overfull \hbox (122.98407pt too wide) in paragraph at lines 210--211
-[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 calculate[]charge[]density[]2d(eigen
-values,
- []
-
-
-Overfull \hbox (1.84122pt too wide) in paragraph at lines 210--211
-\OT1/cmtt/m/n/10 eigenvectors[]2d, fermi[]level)\OT1/cmr/m/n/10 ] Cal-cu-lates 
-the elec-tron charge den-sity us-ing the com-puted eigen-
- []
-
-
-Overfull \hbox (23.23494pt too wide) in paragraph at lines 213--214
-[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 self[]consistent[]solver[]2d(voltage
-s,
- []
-
-LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <12> not available
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 216.
+<../figures/stability_results/charge_stability_P1_P2.png, id=223, 578.16pt x 50
+5.89pt>
+File: ../figures/stability_results/charge_stability_P1_P2.png Graphic file (typ
+e png)
+<use ../figures/stability_results/charge_stability_P1_P2.png>
+Package pdftex.def Info: ../figures/stability_results/charge_stability_P1_P2.pn
+g  used on input line 158.
+(pdftex.def)             Requested size: 452.9679pt x 396.34486pt.
 
 
 [5]
 
-[6]
-Overfull \hbox (43.02242pt too wide) in paragraph at lines 327--328
+LaTeX Warning: `!h' float specifier changed to `!ht'.
+
+
+Overfull \hbox (43.02242pt too wide) in paragraph at lines 175--176
 \OT1/cmr/m/n/10 The dis-cretized Pois-son equa-tion be-comes a lin-ear sys-tem 
 $\OML/cmm/m/it/10 A^^^ \OT1/cmr/m/n/10 = \OML/cmm/m/it/10 b$\OT1/cmr/m/n/10 . S
 parse lin-ear solvers from \OT1/cmtt/m/n/10 scipy.sparse.linalg
@@ -844,32 +848,83 @@ parse lin-ear solvers from \OT1/cmtt/m/n/10 scipy.sparse.linalg
 
 
 
-[7]
-
-LaTeX Warning: Reference `fig:benchmark_summary' on page 8 undefined on input l
-ine 338.
-
-<benchmark_summary_all_scenarios.png, id=194, 2601.72pt x 722.7pt>
-File: benchmark_summary_all_scenarios.png Graphic file (type png)
-<use benchmark_summary_all_scenarios.png>
-Package pdftex.def Info: benchmark_summary_all_scenarios.png  used on input lin
-e 342.
-(pdftex.def)             Requested size: 452.9679pt x 125.82376pt.
-
-
-[8
+[6
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.362 \paragraph
-                {\texttt{eigsh} (ARPACK)} <./benchmark_summary_all_scenarios.pn
-g>]
+l.176 
+       <../figures/simulation_results_2d.png>]
+
+[7
+pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) ha
+s been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.185 
+       <../figures/stability_results/charge_stability_P1_P2.png>]
+<../figures/my_benchmark_results.png, id=252, 825.8052pt x 587.796pt>
+File: ../figures/my_benchmark_results.png Graphic file (type png)
+<use ../figures/my_benchmark_results.png>
+Package pdftex.def Info: ../figures/my_benchmark_results.png  used on input lin
+e 191.
+(pdftex.def)             Requested size: 452.9679pt x 322.4188pt.
+
+
+[8
+pdfTeX warning (ext4): destination with the same identifier (name{figure.5}) ha
+s been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.210 
+       <../figures/my_benchmark_results.png>]
+LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10> not available
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 212.
+
 
 [9]
 
 [10]
-runsystem(latexminted cleantemp  --timestamp 20250513104732 55876228853ABF632DE
+Overfull \hbox (31.59288pt too wide) in paragraph at lines 281--282
+[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 solve[]schrodinger[]2d(potential[]2d
+)\OT1/cmr/m/n/10 ] Solves the time-independent
+ []
+
+
+Overfull \hbox (73.74457pt too wide) in paragraph at lines 281--282
+\OT1/cmr/m/n/10 Hamil-to-nian. It finds the low-est few eigen-val-ues and cor-r
+e-spond-ing eigen-vec-tors us-ing \OT1/cmtt/m/n/10 scipy.sparse.linalg.eigsh\OT
+1/cmr/m/n/10 . 
+ []
+
+
+Overfull \hbox (122.98407pt too wide) in paragraph at lines 282--283
+[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 calculate[]charge[]density[]2d(eigen
+values,
+ []
+
+
+Overfull \hbox (1.84122pt too wide) in paragraph at lines 282--283
+\OT1/cmtt/m/n/10 eigenvectors[]2d, fermi[]level)\OT1/cmr/m/n/10 ] Cal-cu-lates 
+the elec-tron charge den-sity us-ing the com-puted eigen-
+ []
+
+
+Overfull \hbox (23.23494pt too wide) in paragraph at lines 285--286
+[]\OT1/cmr/m/n/10 (1D) or \OT1/cmtt/m/n/10 self[]consistent[]solver[]2d(voltage
+s,
+ []
+
+LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <12> not available
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 288.
+
+
+[11]
+
+[12]
+
+[13]
+runsystem(latexminted cleantemp  --timestamp 20250514121153 55876228853ABF632DE
 C9346A4F372EC)...executed safely (allowed).
 
  (./documentation.aux)
@@ -877,30 +932,17 @@ C9346A4F372EC)...executed safely (allowed).
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
-
-
-LaTeX Warning: There were undefined references.
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
-
-Package rerunfilecheck Warning: File `documentation.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `documentation.out':
-(rerunfilecheck)             Before: 5487BB5A03978F988F9B872418EB9395;4481
-(rerunfilecheck)             After:  27C1599D7AE012392975DD538582588E;5546.
+Package rerunfilecheck Info: File `documentation.out' has not changed.
+(rerunfilecheck)             Checksum: D3328E253FFEC5B57ACE578E33D585FF;6139.
  ) 
 Here is how much of TeX's memory you used:
- 26321 strings out of 474237
- 523196 string characters out of 5742825
- 1026583 words of memory out of 5000000
- 48960 multiletter control sequences out of 15000+600000
- 565511 words of font info for 60 fonts, out of 8000000 for 9000
+ 26604 strings out of 474237
+ 526502 string characters out of 5742825
+ 1036874 words of memory out of 5000000
+ 49228 multiletter control sequences out of 15000+600000
+ 566156 words of font info for 62 fonts, out of 8000000 for 9000
  475 hyphenation exceptions out of 8191
- 82i,17n,91p,617b,1305s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 82i,8n,91p,1685b,736s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texmf
 /fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texmf/fonts/type1/public
 /amsfonts/cm/cmex10.pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmmi10
@@ -909,14 +951,15 @@ mf/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texmf/fonts/type1/publi
 c/amsfonts/cm/cmr12.pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmr17.
 pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/share/texmf
 /fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texmf/fonts/type1/public/a
-msfonts/cm/cmsy10.pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmsy7.pf
-b></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/share/texmf
-/fonts/type1/public/amsfonts/cm/cmtt12.pfb></usr/share/texmf/fonts/type1/public
-/cm-super/sfrm1000.pfb>
-Output written on documentation.pdf (10 pages, 349362 bytes).
+msfonts/cm/cmr9.pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmsy10.pfb
+></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texmf/f
+onts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texmf/fonts/type1/public/a
+msfonts/cm/cmtt10.pfb></usr/share/texmf/fonts/type1/public/amsfonts/cm/cmtt12.p
+fb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb>
+Output written on documentation.pdf (13 pages, 729787 bytes).
 PDF statistics:
- 303 PDF objects out of 1000 (max. 8388607)
- 256 compressed objects within 3 object streams
- 63 named destinations out of 1000 (max. 500000)
- 218 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 379 PDF objects out of 1000 (max. 8388607)
+ 318 compressed objects within 4 object streams
+ 72 named destinations out of 1000 (max. 500000)
+ 305 words of extra memory for PDF output out of 10000 (max. 10000000)
 

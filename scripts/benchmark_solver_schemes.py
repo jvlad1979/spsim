@@ -15,7 +15,17 @@ import time
 import numpy.fft as fft
 import random
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm  # For colormaps
 # import cProfile # For more detailed profiling
+
+plt.rcParams.update(
+    {
+        "text.usetex": True,  # Use LaTeX for text rendering
+        "font.family": "serif",  # Set the font family to serif
+        "font.serif": ["Times New Roman"],  # Specify the serif font
+        "font.size": 12,  # Set the default font size - Adjusted for better readability in subplots
+    }
+)
 
 # --- Physical Constants ---
 hbar = const.hbar
@@ -419,8 +429,8 @@ def benchmark_sc_iteration(
 
         # 5. Mix potential for stability
         current_iter_mixing = mixing
-        if is_warm_start and i == 0: # First iteration of a warm start
-            current_iter_mixing = 0.5 # Use a more aggressive mixing for the first step
+        if is_warm_start and i == 0:  # First iteration of a warm start
+            current_iter_mixing = 0.5  # Use a more aggressive mixing for the first step
             # print(f"  Warm start: Using aggressive mixing {current_iter_mixing} for iter 0") # Optional debug
 
         electrostatic_potential_V += current_iter_mixing * (
@@ -782,9 +792,7 @@ if __name__ == "__main__":
 
         # One figure per scenario for clarity
         for scenario_idx, scenario_name in enumerate(scenarios):
-            fig, axs = plt.subplots(
-                n_metrics, 1, figsize=(12, 5 * n_metrics), sharex=True
-            )
+            fig, axs = plt.subplots(n_metrics, 1, figsize=(8, 12), sharex=True)
             if n_metrics == 1:  # Make axs iterable if only one metric
                 axs = [axs]
             fig.suptitle(
@@ -792,7 +800,7 @@ if __name__ == "__main__":
                 fontsize=16,
             )
 
-            bar_width = 0.35
+            bar_width = 0.15
 
             for metric_idx, (metric_key, metric_label) in enumerate(
                 metrics_to_plot.items()
@@ -853,7 +861,7 @@ if __name__ == "__main__":
                                 f"{conv_count}/{n_samples_total}",
                                 ha="center",
                                 va="bottom",
-                                fontsize=8,
+                                fontsize=12,
                                 rotation=0,
                             )
 
@@ -875,54 +883,107 @@ if __name__ == "__main__":
             # plt.show() # Optionally show plot
 
     # --- Plotting Summary ---
-    def plot_benchmark_summary(summary_stats, n_samples_total):
-        """Plots a summary of the benchmark statistics."""
+
+    def plot_benchmark_summary_academic(
+        summary_stats,
+        n_samples_total,
+        output_filename_base="benchmark_summary_academic",
+    ):
+        """
+        Plots a summary of the benchmark statistics, optimized for academic publications.
+        Generates a single figure with subplots for all scenarios and metrics.
+        """
         schrodinger_configs = list(summary_stats.keys())
         if not schrodinger_configs:
-            print("No data to plot.")
+            print("No Schrödinger configurations to plot.")
             return
 
-        poisson_methods = list(summary_stats[schrodinger_configs[0]].keys())
-        scenarios = list(
-            summary_stats[schrodinger_configs[0]][poisson_methods[0]].keys()
-        )
+        try:
+            poisson_methods = list(summary_stats[schrodinger_configs[0]].keys())
+            if not poisson_methods:
+                print("No Poisson methods to plot.")
+                return
+            scenarios = list(
+                summary_stats[schrodinger_configs[0]][poisson_methods[0]].keys()
+            )
+            if not scenarios:
+                print("No scenarios to plot.")
+                return
+        except (KeyError, IndexError):
+            print(
+                "summary_stats has an unexpected structure. Cannot determine Poisson methods or scenarios."
+            )
+            return
 
         metrics_to_plot = {
             "total_time": "Avg Total Time (s)",
             "schrodinger_time_avg": "Avg Schrödinger Time / Iter (s)",
             "poisson_time_avg": "Avg Poisson Time / Iter (s)",
-            # "iterations": "Avg Iterations" # Removed iterations from plot
+            # "iterations": "Avg Iterations" # Ensure 'iterations' data includes 'converged_count'
         }
+        if not metrics_to_plot:
+            print("No metrics defined for plotting.")
+            return
 
         n_metrics = len(metrics_to_plot)
         n_scenarios = len(scenarios)
 
-        # Create a single figure with subplots for all scenarios
+        # --- Plotting Style and Parameters ---
+        plt.style.use("seaborn-v0_8-paper")  # Cleaner style for publications
+        plt.rcParams["font.size"] = 10
+        plt.rcParams["axes.titlesize"] = 12
+        plt.rcParams["axes.labelsize"] = 10
+        plt.rcParams["xtick.labelsize"] = 9
+        plt.rcParams["ytick.labelsize"] = 9
+        plt.rcParams["legend.fontsize"] = 9
+        plt.rcParams["figure.titlesize"] = 14
+        # plt.rcParams['font.family'] = 'sans-serif'
+        # plt.rcParams['font.sans-serif'] = ['Arial'] # Example: Specify font if needed
+
+        # --- Figure Size Calculation ---
+        # Aim for ~3.5-4 inches per subplot width, ~3 inches per subplot height
+        subplot_base_width = 4.0
+        subplot_base_height = 3.0
+        MAX_FIG_WIDTH = 18  # Max width in inches
+        MAX_FIG_HEIGHT = 24  # Max height in inches
+
+        # Calculate figure width and height
+        fig_width = min(MAX_FIG_WIDTH, subplot_base_width * n_metrics)
+        # Adjust height for suptitle and legend (approx 1.5-2 inches)
+        fig_height = min(MAX_FIG_HEIGHT, subplot_base_height * n_scenarios + 2.0)
+
         fig, axs = plt.subplots(
             n_scenarios,
             n_metrics,
-            figsize=(12 * n_metrics, 5 * n_scenarios),
-            sharex=True,
-            sharey=False,
-        )  # Adjust figsize
-        if n_scenarios == 1 and n_metrics == 1:
-            axs = np.array([[axs]])  # Ensure axs is a 2D array
-        elif n_scenarios == 1:
-            axs = np.array([axs])  # Ensure axs is a 2D array
-        elif n_metrics == 1:
-            axs = axs[:, np.newaxis]  # Ensure axs is a 2D array
+            figsize=(fig_width, fig_height),
+            sharex="col",  # Share x-axis per column of metrics
+            sharey=False,  # Different metrics will have different y-scales
+            squeeze=False,  # Always return a 2D array for axs
+        )
 
         fig.suptitle(
-            "Benchmark Results: All Scenarios", fontsize=16
-        )  # Overall title
+            "Benchmark Performance Summary", y=0.98 if n_scenarios == 1 else 0.99
+        )
 
-        bar_width = 0.8 / len(poisson_methods)  # Adjust bar width
+        # --- Bar and Color Configuration ---
+        num_poisson_methods = len(poisson_methods)
+        group_total_width_allowance = (
+            0.8  # How much of the x-tick space the group of bars occupies
+        )
+        bar_width = group_total_width_allowance / num_poisson_methods
+
+        # Colorblind-friendly colors
+        colors = cm.get_cmap("tab10", num_poisson_methods).colors
+        # Optional: hatches for B&W printing
+        # hatches = ['/', '\\', 'x', '.', '*', '+', 'O'] * (num_poisson_methods // 7 + 1)
+
+        plot_handles_legend = {}  # For storing one handle per Poisson method for the figure legend
 
         for scenario_idx, scenario_name in enumerate(scenarios):
             for metric_idx, (metric_key, metric_label) in enumerate(
                 metrics_to_plot.items()
             ):
-                ax = axs[scenario_idx, metric_idx]  # Access subplot correctly
+                ax = axs[scenario_idx, metric_idx]
                 x_labels = schrodinger_configs
                 x_pos = np.arange(len(x_labels))
 
@@ -937,73 +998,193 @@ if __name__ == "__main__":
                             ]
                             means.append(data["mean"])
                             stds.append(data["std"])
+                            # Assuming "iterations" key holds convergence data
                             converged_counts.append(
-                                summary_stats[sch_name][poisson_name][scenario_name][
-                                    "iterations"
-                                ]["converged_count"]
+                                summary_stats[sch_name][poisson_name][scenario_name]
+                                .get("iterations", {})  # Use .get for safety
+                                .get("converged_count", 0)  # Default to 0 if not found
                             )
-                        except (
-                            KeyError,
-                            TypeError,
-                        ):  # Handle missing data or structure issues
-                            means.append(0)  # Plot as zero if data missing
+                        except (KeyError, TypeError):
+                            means.append(0)
                             stds.append(0)
                             converged_counts.append(0)
 
-                    # Calculate positions for grouped bars
-                    positions = (
-                        x_pos
-                        + (i - len(poisson_methods) / 2 + bar_width / 2) * bar_width
-                    )
+                    # Corrected bar positioning: (i - (N-1)/2) * bar_width
+                    # N = num_poisson_methods
+                    # This centers the group of bars around x_pos
+                    position_offset = (i - (num_poisson_methods - 1) / 2) * bar_width
+                    bar_positions = x_pos + position_offset
+
                     rects = ax.bar(
-                        positions,
+                        bar_positions,
                         means,
                         bar_width,
                         yerr=stds,
-                        label=f"{poisson_name}",
-                        capsize=5,
+                        label=poisson_name,
+                        color=colors[i % len(colors)],
+                        # hatch=hatches[i % len(hatches)] if hatches else None, # Optional hatch
+                        capsize=4,
+                        alpha=0.85,
                     )
+                    if poisson_name not in plot_handles_legend:
+                        plot_handles_legend[poisson_name] = rects[0]
 
                     # Add text for converged count on top of bars
                     for rect_idx, rect in enumerate(rects):
                         height = rect.get_height()
-                        y_val = height + stds[rect_idx]  # Position above error bar
+                        mean_val = means[rect_idx]
+                        std_val = stds[rect_idx]
+
+                        # Position text above the error bar or bar
+                        y_val_text_base = (
+                            mean_val + std_val if not np.isnan(std_val) else mean_val
+                        )
+                        if np.isnan(y_val_text_base):
+                            y_val_text_base = 0  # Handle case where mean itself is NaN
+
                         conv_count = converged_counts[rect_idx]
-                        if conv_count > 0 and not np.isnan(
-                            height
-                        ):  # Only show if bar exists and count > 0
-                            ax.text(
-                                rect.get_x() + rect.get_width() / 2.0,
-                                y_val
-                                + 0.01
-                                * np.nanmax(means),  # Adjust offset based on max value
-                                f"{conv_count}/{n_samples_total}",
-                                ha="center",
-                                va="bottom",
-                                fontsize=7,
-                                rotation=90,
+
+                        # Only show text if bar has a non-NaN height and count > 0 (or if you want to show 0/N)
+                        if (
+                            not np.isnan(height) and n_samples_total > 0
+                        ):  # Show even if conv_count is 0
+                            # Dynamic offset based on y-axis scale to prevent overlap
+                            y_axis_range = ax.get_ylim()[1] - ax.get_ylim()[0]
+                            text_v_offset = y_axis_range * 0.02  # 2% of y-axis height
+
+                            # Ensure text is above, check for negative bars if applicable
+                            final_y_for_text = (
+                                y_val_text_base + text_v_offset
+                                if height >= 0
+                                else y_val_text_base
+                                - text_v_offset
+                                - (y_axis_range * 0.05)
                             )
 
+                            ax.text(
+                                rect.get_x() + rect.get_width() / 2.0,
+                                final_y_for_text,
+                                f"{conv_count}/{n_samples_total}",
+                                ha="center",
+                                va="bottom" if height >= 0 else "top",
+                                fontsize=8,  # Slightly larger for readability
+                                rotation=90,  # Keep 90 for compactness
+                            )
+
+                # --- Axis Labels, Ticks, and Titles for Subplot ---
                 ax.set_ylabel(metric_label)
                 ax.set_xticks(x_pos)
-                ax.set_xticklabels(x_labels, rotation=45, ha="right")
-                ax.grid(True, axis="y", linestyle=":", alpha=0.7)
-                if scenario_idx == 0 and metric_idx == 0:  # Add legend once
-                    ax.legend(
-                        title="Poisson Solver", loc="upper left", bbox_to_anchor=(1, 1)
-                    )
-                ax.set_title(
-                    f"Scenario: {scenario_name.replace('_', ' ').title()}"
-                )  # Title each subplot
 
-        plt.tight_layout(
-            rect=[0, 0, 0.95, 0.95]
-        )  # Adjust layout to make space for legend and suptitle
-        plot_filename = "benchmark_summary_all_scenarios.png"
-        plt.savefig(plot_filename)
-        print(f"Combined benchmark plot saved to {plot_filename}")
+                if (
+                    scenario_idx == n_scenarios - 1
+                ):  # Only show x-labels on the bottom row
+                    ax.set_xticklabels(
+                        [label.replace("_", " ").title() for label in x_labels],
+                        rotation=45,
+                        ha="right",
+                    )
+                else:
+                    ax.set_xticklabels([])
+
+                ax.grid(True, axis="y", linestyle=":", alpha=0.7)
+
+                # Set subplot title to indicate the scenario (and metric implicitly by column)
+                if n_metrics > 1 and n_scenarios > 1:  # Full grid titles
+                    ax.set_title(
+                        f"{scenario_name.replace('_', ' ').title()}\n({metric_label.split('(')[0].strip()})",
+                        fontsize=10,  # Smaller title for individual plots if many
+                    )
+                elif n_scenarios > 1:  # Only scenario in title if single metric column
+                    ax.set_title(
+                        f"{scenario_name.replace('_', ' ').title()}", fontsize=11
+                    )
+                elif (
+                    n_metrics > 1
+                ):  # Only metric in title if single scenario row (scenario in suptitle)
+                    ax.set_title(f"{metric_label.split('(')[0].strip()}", fontsize=11)
+
+                # Auto-adjust y-limits to give some padding, especially for text
+                current_ylim = ax.get_ylim()
+                padding_factor = 0.10  # 10% padding
+                ylim_range = current_ylim[1] - current_ylim[0]
+                if ylim_range == 0:  # Handle flat data
+                    ylim_range = 1 if current_ylim[1] == 0 else abs(current_ylim[1])
+
+                # Adjust top padding more if positive values, bottom if negative
+                if all(
+                    m >= 0 for m in means if not np.isnan(m)
+                ):  # All positive or zero
+                    ax.set_ylim(
+                        current_ylim[0], current_ylim[1] + ylim_range * padding_factor
+                    )
+                elif all(
+                    m <= 0 for m in means if not np.isnan(m)
+                ):  # All negative or zero
+                    ax.set_ylim(
+                        current_ylim[0] - ylim_range * padding_factor, current_ylim[1]
+                    )
+                else:  # Mixed or general case
+                    ax.set_ylim(
+                        current_ylim[0] - ylim_range * (padding_factor / 2),
+                        current_ylim[1] + ylim_range * (padding_factor / 2),
+                    )
+
+        # --- Figure Legend ---
+        # Create handles and labels for the figure-level legend based on collected unique handles
+        fig_legend_handles = [
+            plot_handles_legend[pn]
+            for pn in poisson_methods
+            if pn in plot_handles_legend
+        ]
+        fig_legend_labels = [pn for pn in poisson_methods if pn in plot_handles_legend]
+
+        if fig_legend_handles:
+            fig.legend(
+                fig_legend_handles,
+                fig_legend_labels,
+                title="Poisson Solver",
+                loc="lower center",
+                bbox_to_anchor=(
+                    0.5,
+                    0.01,
+                ),  # Adjust 0.01 based on fig_height and font size
+                ncol=min(len(poisson_methods), 4),  # Max 4 columns for legend
+                frameon=True,
+                fontsize=9,
+            )
+
+        # --- Layout Adjustments ---
+        # Adjust layout to make space for legend and suptitle
+        # The y value for suptitle and bbox_to_anchor for legend might need slight tweaks
+        # depending on the final figure height and number of scenarios/legend items.
+        bottom_padding = 0.15 if len(poisson_methods) > 0 else 0.05
+        fig.subplots_adjust(
+            left=0.08,
+            right=0.97,
+            top=0.92 if n_scenarios > 1 else 0.88,
+            bottom=bottom_padding,
+            hspace=0.35,
+            wspace=0.25,
+        )
+
+        # --- Save Figure ---
+        png_filename = f"{output_filename_base}.png"
+        pdf_filename = f"{output_filename_base}.pdf"
+
+        plt.savefig(png_filename, dpi=300, bbox_inches="tight")
+        print(f"Academic benchmark plot saved to {png_filename}")
+        try:
+            plt.savefig(pdf_filename, dpi=300, bbox_inches="tight")
+            print(f"Academic benchmark plot saved to {pdf_filename}")
+        except Exception as e:
+            print(f"Could not save PDF: {e}")
+
+        # plt.show() # Optionally show plot interactively
+        plt.close(fig)  # Close the figure to free memory
         # plt.show()  # Optionally show plot
 
-    plot_benchmark_summary(benchmark_summary_stats, N_SAMPLES)
+    plot_benchmark_summary_academic(
+        benchmark_summary_stats, N_SAMPLES, "my_benchmark_results"
+    )
 
     print("\nBenchmark script finished.")
