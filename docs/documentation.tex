@@ -167,7 +167,35 @@ The Schrödinger and Poisson equations are discretized using the finite differen
 where $\psi_i$ is the value of $\psi$ at grid point $x_i$, and $dx$ is the grid spacing. In 2D, the Laplacian $\nabla^2 = \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2}$ is approximated using a 5-point stencil. This transforms the differential equations into a system of linear algebraic equations, which can be represented by sparse matrices.
 
 \subsection{Eigenvalue Solvers}
-The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{eigsh} for Hermitian matrices) are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently.
+The discretized Schrödinger equation becomes a matrix eigenvalue problem $H\psi = E\psi$. Sparse eigenvalue solvers from \texttt{scipy.sparse.linalg} are used to find the lowest energy eigenvalues and corresponding eigenvectors efficiently. The primary solvers used are \texttt{eigsh} and \texttt{lobpcg}, which are described in more detail below.
+
+\subsubsection{\texttt{eigsh} (ARPACK)}
+The \texttt{eigsh} function from \texttt{scipy.sparse.linalg} is used to solve the sparse matrix eigenvalue problem arising from the discretized Schrödinger equation. \texttt{eigsh} is a wrapper around the ARPACK library, which implements the Implicitly Restarted Arnoldi Method (IRAM).
+
+ARPACK is designed for finding a few eigenvalues and eigenvectors of large sparse matrices. It is particularly efficient for finding eigenvalues at the extreme ends of the spectrum (i.e., smallest or largest magnitude). The general idea behind the Arnoldi method is to construct an orthonormal basis of the Krylov subspace, which is then used to approximate the eigenvalues and eigenvectors of the original matrix.
+
+Key parameters for \texttt{eigsh} include:
+\begin{itemize}
+    \item \texttt{k}: The number of eigenvalues and eigenvectors to find.
+    \item \texttt{which}: Specifies which eigenvalues to find (e.g., \texttt{'SM'} for smallest magnitude, \texttt{'LM'} for largest magnitude).
+    \item \texttt{sigma}: Specifies a shift value for finding eigenvalues near a particular value. Using \texttt{sigma} can improve convergence for interior eigenvalues.
+    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+    \item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
+
+\subsubsection{\texttt{lobpcg}}
+The \texttt{lobpcg} function from \texttt{scipy.sparse.linalg} implements the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) method. LOBPCG is an iterative method for finding the lowest (or highest) eigenvalues and corresponding eigenvectors of a symmetric (or Hermitian) matrix.
+
+LOBPCG is a block Krylov subspace method, which means it operates on a block of vectors simultaneously. This can lead to faster convergence compared to single-vector methods like the power method or the Lanczos method. The general idea is to iteratively refine an approximate solution by combining information from multiple search directions (block vectors) and using preconditioning to accelerate convergence.
+
+Key parameters for \texttt{lobpcg} include:
+\begin{itemize}
+    \item \texttt{X}: An initial guess for the eigenvectors. The shape of \texttt{X} determines the number of eigenvalues and eigenvectors to find.
+    \item \texttt{B}: A preconditioner matrix. A good preconditioner can significantly improve convergence.
+    \item \texttt{M}: A constraint matrix.
+    \item \texttt{tol}: The desired relative accuracy for the eigenvalues.
+    \item \texttt{maxiter}: The maximum number of iterations allowed.
+\end{itemize}
 
 \subsection{Linear System Solvers}
 The discretized Poisson equation becomes a linear system $A\phi = b$. Sparse linear solvers from \texttt{scipy.sparse.linalg} (specifically \texttt{spsolve} for direct solution or iterative solvers like GMRES (\texttt{gmres}) or LGMRES (\texttt{lgmres}) as fallbacks) are used to find the potential $\phi$. Dirichlet boundary conditions are implemented by modifying the corresponding rows and right-hand side vector of the linear system matrix.
