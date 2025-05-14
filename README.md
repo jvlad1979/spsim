@@ -1,4 +1,4 @@
-# CMSC661 Final Project: \\ A Schrodinger-Poisson based simulator for semiconductor quantum dot devices
+# CMSC661 Final Project: A Schrodinger-Poisson based simulator for semiconductor quantum dot devices
 
 Daniel Schug  
 
@@ -67,7 +67,7 @@ python3 scripts/simulate_charge_stability.py
 
 ### Charge Stability Diagram
 
-![Charge Stability Diagram](figures/charge_stability_P1_P2.png)
+![Charge Stability Diagram](figures/stability_results/charge_stability_P1_P2.png)
 *Replace this with the actual path to your charge stability diagram image.*
 
 ## Project Structure
